@@ -1,0 +1,76 @@
+{
+    "name": "staga",
+    "version": "1.0.0",
+    "description": "A TypeScript library for managing state transactions with saga pattern, rollbacks, and middleware support",
+    "main": "dist/index.js",
+    "module": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "require": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE",
+        "CHANGELOG.md"
+    ],
+    "scripts": {
+        "build": "tsup",
+        "build:watch": "tsc --watch",
+        "dev": "tsc --watch",
+        "test": "vitest run",
+        "test:watch": "vitest --watch",
+        "type-check": "tsc --noEmit",
+        "lint": "eslint src/**/*.ts",
+        "format": "prettier --write src/**/*.ts",
+        "demo": "node examples/simple-demo.js",
+        "demo:advanced": "node examples/advanced-usage.js",
+        "prepublishOnly": "npm run build && npm test"
+    },
+    "keywords": [
+        "saga",
+        "state-management",
+        "transactions",
+        "rollback",
+        "middleware",
+        "typescript",
+        "undo-redo",
+        "compensation",
+        "retry",
+        "timeout",
+        "state",
+        "management",
+        "atomic",
+        "operations"
+    ],
+    "author": "Your Name <your.email@example.com>",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/yourusername/staga.git"
+    },
+    "bugs": {
+        "url": "https://github.com/yourusername/staga/issues"
+    },
+    "homepage": "https://github.com/yourusername/staga#readme",
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "@typescript-eslint/eslint-plugin": "^6.13.0",
+        "@typescript-eslint/parser": "^6.13.0",
+        "eslint": "^8.54.0",
+        "prettier": "^3.1.0",
+        "tsup": "^8.0.0",
+        "typescript": "^5.3.0",
+        "vitest": "^1.0.0"
+    },
+    "engines": {
+        "node": ">=16.0.0"
+    },
+    "directories": {
+        "example": "examples"
+    }
+}
