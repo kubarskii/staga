@@ -37,6 +37,13 @@ describe('StateManager', () => {
         expect(stateManager.getState()).toEqual(newState);
     });
 
+    it('should retain initial state when undo is called without prior changes', () => {
+        const freshManager = new StateManager(initialState);
+
+        expect(() => freshManager.undo()).not.toThrow();
+        expect(freshManager.getState()).toEqual(initialState);
+    });
+
     it('should create and rollback to snapshots', () => {
         stateManager.createSnapshot();
 
