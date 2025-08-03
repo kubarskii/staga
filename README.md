@@ -235,9 +235,10 @@ try {
 ### SagaManager
 
 - `static create<TState>(initialState: TState): SagaManager<TState>`
-- `createTransaction<TPayload>(name: string): Transaction<TState, TPayload>`
-- `use<TPayload>(middleware: Middleware<TState, TPayload>): void`
-- `on(event: string, callback: Listener): void`
+- `createTransaction<TPayload = unknown>(name: string): TransactionBuilder<TState, TPayload>`
+- `createVoidTransaction(name: string): Transaction<TState, void>`
+- `use(middleware: AnyMiddleware<TState>): void`
+- `onEvent(eventType: string, listener: SagaEventListener): void` _(replaces deprecated `on` method)_
 - `getState(): TState`
 - `undo(): void`
 - `redo(): void`
