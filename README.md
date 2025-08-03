@@ -325,6 +325,7 @@ matchEvent(evt)
 ### SagaManager
 
 - `static create<TState>(initialState: TState): SagaManager<TState>`
+
 - `createTransaction<TPayload = unknown>(name: string): TransactionBuilder<TState, TPayload>`
 - `createVoidTransaction(name: string): Transaction<TState, void>`
 - `use(middleware: AnyMiddleware<TState>): void`
@@ -334,6 +335,8 @@ matchEvent(evt)
 - `getState(): TState`
 - `undo(): void`
 - `redo(): void`
+
+The `createTransaction` method returns a `TransactionBuilder`, allowing you to configure steps before running the transaction.
 
 ### Transaction
 
