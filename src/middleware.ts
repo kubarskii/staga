@@ -34,8 +34,9 @@ export function loadPersistedState<TState extends object>(
 }
 
 /**
- * Creates a logging middleware that logs transaction and step events
- * with proper state type inference
+ * Creates a logging middleware that logs transaction lifecycle events
+ * (start, completion, and failure with execution time) with proper state type inference.
+ * Does not log individual transaction steps.
  */
 export function createLoggingMiddleware<TState extends object>(): Middleware<TState, unknown> {
     return async (ctx, next) => {
