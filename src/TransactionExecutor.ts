@@ -32,12 +32,25 @@ export class TransactionExecutor<TState extends object, TPayload> {
         while (true) {
             try {
                 if (step.timeout > 0) {
-                    await Promise.race([
-                        step.execute(this.stateManager.getState(), payload),
-                        new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error(`Step "${step.name}" timed out`)), step.timeout)
-                        ),
-                    ]);
+                    await new Promise<void>((resolve, reject) => {
+                        const timer: NodeJS.Timeout = setTimeout(
+                            () => reject(new Error(`Step "${step.name}" timed out`)),
+                            step.timeout
+                        );
+
+                        Promise.resolve(
+                            step.execute(this.stateManager.getState(), payload)
+                        ).then(
+                            () => {
+                                clearTimeout(timer);
+                                resolve();
+                            },
+                            (err) => {
+                                clearTimeout(timer);
+                                reject(err);
+                            }
+                        );
+                    });
                 } else {
                     await step.execute(this.stateManager.getState(), payload);
                 }

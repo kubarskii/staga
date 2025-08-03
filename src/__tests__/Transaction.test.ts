@@ -213,8 +213,20 @@ describe('Transaction', () => {
 
             transaction.addStep('fast-step', fastStep, undefined, { timeout: 100 });
 
+            const unhandled: unknown[] = [];
+            const handle = (err: unknown) => {
+                unhandled.push(err);
+            };
+            process.on('unhandledRejection', handle);
+
             await expect(transaction.run({})).resolves.not.toThrow();
+
+            await new Promise(resolve => setTimeout(resolve, 150));
+
+            process.off('unhandledRejection', handle);
+
             expect(fastStep).toHaveBeenCalled();
+            expect(unhandled).toHaveLength(0);
         });
 
         it('should not apply timeout when timeout is 0', async () => {
