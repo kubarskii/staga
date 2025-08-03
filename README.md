@@ -154,7 +154,9 @@ saga.use(async (ctx, next) => {
 
 ### Event System
 
-Listen to transaction lifecycle events:
+#### onEvent
+
+Listen to specific transaction lifecycle events:
 
 ```typescript
 import {
@@ -164,9 +166,13 @@ import {
   StepRetryEvent,
 } from 'staga';
 
-saga.onEvent('transaction:start', (event: TransactionStartEvent) => {
+// Subscribe and capture disposer
+const offStart = saga.onEvent('transaction:start', (event: TransactionStartEvent) => {
   console.log(`Transaction ${event.transactionName} started`);
 });
+
+// Later, clean up the listener
+offStart();
 
 saga.onEvent('transaction:success', (event: TransactionSuccessEvent) => {
   console.log(`Transaction ${event.transactionName} completed`);
@@ -181,7 +187,20 @@ saga.onEvent('step:retry', (event: StepRetryEvent) => {
 });
 ```
 
-Note: `saga.on` is deprecated in favor of `saga.onEvent`.
+#### onAnyEvent
+
+Listen to all saga events with a single handler:
+
+```typescript
+const offAny = saga.onAnyEvent((event) => {
+  console.log('Event:', event.type);
+});
+
+// Later, remove the handler
+offAny();
+```
+
+Note: `saga.on` returns a disposer but is considered legacy. Use `saga.onEvent` instead.
 
 ## Advanced Usage
 
@@ -309,7 +328,9 @@ matchEvent(evt)
 - `createTransaction<TPayload = unknown>(name: string): TransactionBuilder<TState, TPayload>`
 - `createVoidTransaction(name: string): Transaction<TState, void>`
 - `use(middleware: AnyMiddleware<TState>): void`
-- `onEvent(eventType: string, listener: SagaEventListener): void` _(replaces deprecated `on` method)_
+- `onEvent(eventType: string, listener: SagaEventListener): () => void` _(replaces deprecated `on` method)_
+- `onAnyEvent(listener: AnySagaEventListener): () => void`
+- `on(event: string, listener: (...args: unknown[]) => void): () => void` _(legacy)_
 - `getState(): TState`
 - `undo(): void`
 - `redo(): void`
