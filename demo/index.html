@@ -366,7 +366,7 @@
         let recordedEvents = [];
 
         // Reactive selectors
-        let userBalance$, orderCount$, canAffordLaptop$, orderStats$;
+        let userBalance$, orderCount$, canAffordLaptop$, orderStats$, fullState$;
 
         // Product catalog
         const products = {
@@ -413,7 +413,6 @@
 
             // Initial UI update
             updateUI();
-            updateFullState();
 
             log('✅ Staga demo initialized successfully!');
         }
@@ -462,6 +461,15 @@
             orderStats$.subscribe((stats) => {
                 logReactive(`📊 Order stats: ${JSON.stringify(stats)}`);
             });
+
+            // Subscribe to full state changes to update UI
+            fullState$ = saga.select(state => state);
+            const updateStateViews = () => {
+                updateFullState();
+                updateMetrics();
+            };
+            fullState$.subscribe(updateStateViews);
+            updateStateViews();
         }
 
         function setupEventListeners() {
@@ -595,22 +603,35 @@
                         }
                     })
                     .addStep('reserve-stock', (state, payload) => {
-                        const product = state.products.find(p => p.id === payload.productId);
-                        product.stock -= payload.quantity;
+                        state.products = state.products.map(p =>
+                            p.id === payload.productId
+                                ? { ...p, stock: p.stock - payload.quantity }
+                                : p
+                        );
                     }, (state, payload) => {
                         // Compensation: restore stock
-                        const product = state.products.find(p => p.id === payload.productId);
-                        product.stock += payload.quantity;
+                        state.products = state.products.map(p =>
+                            p.id === payload.productId
+                                ? { ...p, stock: p.stock + payload.quantity }
+                                : p
+                        );
                     })
                     .addStep('charge-user', (state, payload) => {
                         const product = state.products.find(p => p.id === payload.productId);
                         const totalCost = product.price * payload.quantity;
-                        state.user.balance -= totalCost;
 
-                        // Update analytics
-                        state.analytics.totalRevenue += totalCost;
-                        state.analytics.totalOrders += 1;
-                        state.analytics.averageOrderValue = state.analytics.totalRevenue / state.analytics.totalOrders;
+                        // Update user balance immutably so reactive selectors fire
+                        state.user = { ...state.user, balance: state.user.balance - totalCost };
+
+                        // Update analytics immutably
+                        const newTotalRevenue = state.analytics.totalRevenue + totalCost;
+                        const newTotalOrders = state.analytics.totalOrders + 1;
+                        state.analytics = {
+                            ...state.analytics,
+                            totalRevenue: newTotalRevenue,
+                            totalOrders: newTotalOrders,
+                            averageOrderValue: newTotalRevenue / newTotalOrders
+                        };
                     })
                     .addStep('create-order', (state, payload) => {
                         const product = state.products.find(p => p.id === payload.productId);
@@ -624,15 +645,18 @@
                             status: 'completed',
                             timestamp: Date.now()
                         };
-                        state.orders.push(order);
+                        state.orders = [...state.orders, order];
 
                         // Add success notification
-                        state.notifications.push({
-                            id: `notif_${Date.now()}`,
-                            type: 'success',
-                            message: `Order completed: ${payload.quantity}x ${product.name}`,
-                            timestamp: Date.now()
-                        });
+                        state.notifications = [
+                            ...state.notifications,
+                            {
+                                id: `notif_${Date.now()}`,
+                                type: 'success',
+                                message: `Order completed: ${payload.quantity}x ${product.name}`,
+                                timestamp: Date.now()
+                            }
+                        ];
                     });
 
                 await orderTransaction.run({ productId, quantity });
@@ -820,9 +844,6 @@
             // Update form fields
             document.getElementById('user-name').value = state.user.name;
             document.getElementById('user-balance').value = state.user.balance;
-
-            updateFullState();
-            updateMetrics();
         }
 
         function updateFullState() {
