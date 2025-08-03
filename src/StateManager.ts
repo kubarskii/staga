@@ -113,6 +113,15 @@ export class StateManager<TState extends object> {
     }
 
     /**
+     * Discard the last snapshot without altering state
+     */
+    discardLastSnapshot(): void {
+        if (this.snapshots.length > 0) {
+            this.snapshots.pop();
+        }
+    }
+
+    /**
      * Undo the last state change
      */
     undo(): void {
