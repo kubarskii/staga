@@ -333,5 +333,5 @@ export {
 
 // Run demo if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-    runPayloadInferenceDemo().catch(console.error);
+    runPayloadInferenceDemo().catch(console.error).finally(() => saga.dispose());
 }

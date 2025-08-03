@@ -215,7 +215,7 @@ async function runExamples() {
 
 // Run the examples
 if (import.meta.url === `file://${process.argv[1]}`) {
-    runExamples().catch(console.error);
+    runExamples().catch(console.error).finally(() => saga.dispose());
 }
 
 export { runExamples };

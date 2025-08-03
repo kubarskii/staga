@@ -379,5 +379,5 @@ export {
 
 // Run demo if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-    runTypeSafeDemo().catch(console.error);
+    runTypeSafeDemo().catch(console.error).finally(() => saga.dispose());
 }

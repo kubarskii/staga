@@ -278,5 +278,5 @@ export {
 
 // Run demo if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-    demonstrateExplicitTyping().catch(console.error);
+    demonstrateExplicitTyping().catch(console.error).finally(() => saga.dispose());
 }
