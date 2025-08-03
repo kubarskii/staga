@@ -229,5 +229,5 @@ export {
 
 // Run demo if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-    runTransactionPatterns().catch(console.error);
+    runTransactionPatterns().catch(console.error).finally(() => saga.dispose());
 }

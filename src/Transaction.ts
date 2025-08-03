@@ -3,6 +3,7 @@ import type { StateManager } from './StateManager';
 import { TransactionExecutor } from './TransactionExecutor';
 import { TransactionRollback } from './TransactionRollback';
 import { MiddlewareOrchestrator } from './MiddlewareOrchestrator';
+import { deepEqual } from './ReactiveSelectors';
 
 // Forward declaration to avoid circular dependency
 interface EventEmitter {
@@ -196,7 +197,7 @@ export class Transaction<TState extends object, TPayload = unknown> {
 
         // After successful execution, if state has changed, add it to undo stack
         const finalState = this.stateManager.getState();
-        if (JSON.stringify(initialState) !== JSON.stringify(finalState)) {
+        if (!deepEqual(initialState, finalState)) {
           this.stateManager.addToUndoStack(initialState);
         }
 
@@ -207,6 +208,9 @@ export class Transaction<TState extends object, TPayload = unknown> {
           duration: Date.now() - startTime,
           timestamp: Date.now()
         });
+
+        // Remove rollback snapshot since the transaction completed successfully
+        this.stateManager.discardLastSnapshot();
 
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));

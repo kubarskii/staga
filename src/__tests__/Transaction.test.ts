@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { StateManager } from '../StateManager';
 import { SagaManager } from '../SagaManager';
 import { Transaction } from '../Transaction';
+import { deepEqual } from '../ReactiveSelectors';
 
 interface TestState {
     counter: number;
@@ -26,6 +27,10 @@ describe('Transaction', () => {
         stateManager = sagaManager.stateManager;
         // Use createTypedTransaction for legacy test compatibility
         transaction = sagaManager.createTypedTransaction<TestPayload>('test-transaction');
+    });
+
+    afterEach(() => {
+        sagaManager.dispose();
     });
 
     describe('addStep', () => {
@@ -158,6 +163,55 @@ describe('Transaction', () => {
                 'transaction:rollback'
             ]);
         });
+
+        it('should not add to undo stack when final state is deeply equal but ordered differently', async () => {
+            interface ComplexState {
+                first: string;
+                second: string;
+                nested: { foo: number; bar: number };
+            }
+
+            const complexInitial: ComplexState = {
+                first: 'one',
+                second: 'two',
+                nested: { foo: 1, bar: 2 }
+            };
+
+            const complexSaga = SagaManager.create(complexInitial);
+            const complexTransaction = complexSaga.createTypedTransaction<void>('complex');
+
+            complexTransaction.addStep('reorder', (state) => {
+                const { first, second, nested } = state;
+                delete (state as any).first;
+                delete (state as any).second;
+                delete (state as any).nested;
+                (state as any).nested = { bar: nested.bar, foo: nested.foo };
+                (state as any).second = second;
+                (state as any).first = first;
+            });
+
+            await complexTransaction.run(undefined);
+
+            const finalState = complexSaga.getState();
+
+            // Stringified versions differ due to property order
+            expect(JSON.stringify(finalState)).not.toBe(JSON.stringify(complexInitial));
+            // Deep equality still holds
+            expect(deepEqual(finalState, complexInitial)).toBe(true);
+            // Undo stack should remain empty since state hasn't truly changed
+            expect(complexSaga.stateManager.undoStackLength).toBe(0);
+
+          it('should remove snapshot after successful execution', async () => {
+            const initialSnapshots = stateManager.snapshotsLength;
+
+            transaction.addStep('increment', (state) => {
+                state.counter += 1;
+            });
+
+            await transaction.run({});
+
+            expect(stateManager.snapshotsLength).toBe(initialSnapshots);
+        });
     });
 
     describe('retry mechanism', () => {
@@ -213,8 +267,20 @@ describe('Transaction', () => {
 
             transaction.addStep('fast-step', fastStep, undefined, { timeout: 100 });
 
+            const unhandled: unknown[] = [];
+            const handle = (err: unknown) => {
+                unhandled.push(err);
+            };
+            process.on('unhandledRejection', handle);
+
             await expect(transaction.run({})).resolves.not.toThrow();
+
+            await new Promise(resolve => setTimeout(resolve, 150));
+
+            process.off('unhandledRejection', handle);
+
             expect(fastStep).toHaveBeenCalled();
+            expect(unhandled).toHaveLength(0);
         });
 
         it('should not apply timeout when timeout is 0', async () => {
