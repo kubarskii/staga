@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SagaManager, StateManager, Transaction } from '../index';
 
 interface TestState {
@@ -23,6 +23,10 @@ describe('Edge Cases and Error Handling', () => {
 
   beforeEach(() => {
     saga = SagaManager.create(initialState);
+  });
+
+  afterEach(() => {
+    saga.dispose();
   });
 
   describe('State Management Edge Cases', () => {
@@ -101,6 +105,8 @@ describe('Edge Cases and Error Handling', () => {
       expect(nullableSaga.getState().value).toBe(42);
       expect(nullableSaga.getState().optional).toBe('defined');
       expect(nullableSaga.getState().items).toEqual([null, undefined]);
+
+      nullableSaga.dispose();
     });
 
     it('should handle large state objects', async () => {
@@ -123,6 +129,8 @@ describe('Edge Cases and Error Handling', () => {
 
       expect(largeSaga.getState().count).toBe(10000);
       expect(largeSaga.getState().items).toHaveLength(10001);
+
+      largeSaga.dispose();
     });
   });
 

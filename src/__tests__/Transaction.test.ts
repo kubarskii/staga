@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { StateManager } from '../StateManager';
 import { SagaManager } from '../SagaManager';
 import { Transaction } from '../Transaction';
@@ -26,6 +26,10 @@ describe('Transaction', () => {
         stateManager = sagaManager.stateManager;
         // Use createTypedTransaction for legacy test compatibility
         transaction = sagaManager.createTypedTransaction<TestPayload>('test-transaction');
+    });
+
+    afterEach(() => {
+        sagaManager.dispose();
     });
 
     describe('addStep', () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SagaManager } from '../SagaManager';
 
 interface TestState {
@@ -12,6 +12,10 @@ describe('SagaManager', () => {
 
     beforeEach(() => {
         saga = SagaManager.create(initialState);
+    });
+
+    afterEach(() => {
+        saga.dispose();
     });
 
     it('should create with initial state', () => {
