@@ -209,6 +209,9 @@ export class Transaction<TState extends object, TPayload = unknown> {
           timestamp: Date.now()
         });
 
+        // Remove rollback snapshot since the transaction completed successfully
+        this.stateManager.discardLastSnapshot();
+
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
 

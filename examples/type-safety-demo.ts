@@ -167,3 +167,6 @@ export {
 };
 
 console.log('\n🎉 Type Safety Demo Complete - Zero "as any" casts used!');
+
+// Clean up the saga manager to avoid dangling timers
+saga.dispose();

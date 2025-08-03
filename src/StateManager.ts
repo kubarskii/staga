@@ -5,6 +5,7 @@ export interface StateManagerOptions {
     maxSnapshots?: number;
     autoCleanup?: boolean;
     snapshotInterval?: number; // Create snapshot every N changes for performance
+    clone?: <T>(value: T) => T;
 }
 
 /**
@@ -50,7 +51,7 @@ export class StateManager<TState extends object> {
      * Add a state to the undo stack (for internal use by transactions)
      */
     public addToUndoStack(state: TState): void {
-        this.undoStack.push(structuredClone(state));
+        this.undoStack.push(this.options.clone(state));
         this.redoStack = [];
     }
 
@@ -59,10 +60,11 @@ export class StateManager<TState extends object> {
             maxUndoHistory: options.maxUndoHistory ?? 100,
             maxSnapshots: options.maxSnapshots ?? 20,
             autoCleanup: options.autoCleanup ?? true,
-            snapshotInterval: options.snapshotInterval ?? 10
+            snapshotInterval: options.snapshotInterval ?? 10,
+            clone: options.clone ?? structuredClone
         };
 
-        this.state = structuredClone(initialState);
+        this.state = this.options.clone(initialState);
     }
 
     /**
@@ -77,8 +79,8 @@ export class StateManager<TState extends object> {
      */
     setState(newState: TState): void {
         // Add current state to undo stack
-        this.undoStack.push(structuredClone(this.state));
-        this.state = structuredClone(newState);
+        this.undoStack.push(this.options.clone(this.state));
+        this.state = this.options.clone(newState);
         this.redoStack = [];
         this.changeCount++;
         this.metrics.totalChanges++;
@@ -100,7 +102,7 @@ export class StateManager<TState extends object> {
      * Create a snapshot of the current state
      */
     createSnapshot(): void {
-        this.snapshots.push(structuredClone(this.state));
+        this.snapshots.push(this.options.clone(this.state));
     }
 
     /**
@@ -113,12 +115,21 @@ export class StateManager<TState extends object> {
     }
 
     /**
+     * Discard the last snapshot without altering state
+     */
+    discardLastSnapshot(): void {
+        if (this.snapshots.length > 0) {
+            this.snapshots.pop();
+        }
+    }
+
+    /**
      * Undo the last state change
      */
     undo(): void {
         if (this.undoStack.length > 0) {
             const prev = this.undoStack.pop()!;
-            this.redoStack.push(structuredClone(this.state));
+            this.redoStack.push(this.options.clone(this.state));
             this.state = prev;
             this.metrics.undoOperations++;
         }
@@ -130,7 +141,7 @@ export class StateManager<TState extends object> {
     redo(): void {
         if (this.redoStack.length > 0) {
             const next = this.redoStack.pop()!;
-            this.undoStack.push(structuredClone(this.state));
+            this.undoStack.push(this.options.clone(this.state));
             this.state = next;
             this.metrics.redoOperations++;
         }

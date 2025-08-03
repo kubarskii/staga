@@ -231,5 +231,5 @@ export {
 
 // Run demo if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-    demonstrateAutomaticInference().catch(console.error);
+    demonstrateAutomaticInference().catch(console.error).finally(() => saga.dispose());
 }

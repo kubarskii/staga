@@ -12,6 +12,11 @@ A TypeScript library for managing state transactions with the saga pattern, feat
 - 💾 **Persistence**: Built-in persistence middleware for state storage
 - 📦 **TypeScript**: Full TypeScript support with strong typing
 - 🎯 **Event System**: Listen to transaction and step lifecycle events
+- ⚛️ **Reactive Selectors**: Derive computed state that updates automatically
+- 🔗 **Transaction Composition**: Combine multiple transactions into complex workflows
+- 📜 **Event Replay**: Record and replay events for debugging or testing
+- 📝 **Redux-style Action Creators**: Generate structured step actions
+- 🛡️ **Type-safe Event Helpers**: Create and match events with full type safety
 
 ## Installation
 
@@ -152,22 +157,31 @@ saga.use(async (ctx, next) => {
 Listen to transaction lifecycle events:
 
 ```typescript
-saga.on('transaction:start', (name, payload) => {
-  console.log(`Transaction ${name} started`);
+import {
+  TransactionStartEvent,
+  TransactionSuccessEvent,
+  TransactionFailEvent,
+  StepRetryEvent,
+} from 'staga';
+
+saga.onEvent('transaction:start', (event: TransactionStartEvent) => {
+  console.log(`Transaction ${event.transactionName} started`);
 });
 
-saga.on('transaction:success', (name, payload) => {
-  console.log(`Transaction ${name} completed`);
+saga.onEvent('transaction:success', (event: TransactionSuccessEvent) => {
+  console.log(`Transaction ${event.transactionName} completed`);
 });
 
-saga.on('transaction:fail', (name, error) => {
-  console.log(`Transaction ${name} failed:`, error);
+saga.onEvent('transaction:fail', (event: TransactionFailEvent) => {
+  console.log(`Transaction ${event.transactionName} failed:`, event.error);
 });
 
-saga.on('step:retry', (stepName, attempt) => {
-  console.log(`Step ${stepName} retry attempt ${attempt}`);
+saga.onEvent('step:retry', (event: StepRetryEvent) => {
+  console.log(`Step ${event.stepName} retry attempt ${event.attempt}`);
 });
 ```
+
+Note: `saga.on` is deprecated in favor of `saga.onEvent`.
 
 ## Advanced Usage
 
@@ -230,14 +244,72 @@ try {
 }
 ```
 
+### Reactive Selectors
+
+```typescript
+const activeUsers = saga.createSelector(state =>
+  state.users.filter(u => u.active)
+);
+
+activeUsers.subscribe(users => {
+  console.log('Active users:', users);
+});
+```
+
+### Transaction Composition
+
+```typescript
+const t1 = saga.createTransaction('stepA') /* ... */;
+const t2 = saga.createTransaction('stepB') /* ... */;
+
+await saga.composeSequential('workflow', [t1, t2]).execute(payload);
+```
+
+### Event Replay
+
+```typescript
+const session = saga.startRecording();
+// run transactions...
+saga.stopRecording();
+
+const events = saga.getRecordedEvents();
+await saga.startReplay();
+```
+
+### Redux-style Action Creators
+
+```typescript
+import { createStepAction } from 'staga';
+
+const addUser = createStepAction<AppState, { name: string }>(
+  'user/add',
+  (state, payload) => { state.users.push(payload.name); }
+);
+
+saga.createTransaction('addUser').addStep(addUser).run({ name: 'Jane' });
+```
+
+### Type-safe Event Helpers
+
+```typescript
+import { createEvent, matchEvent } from 'staga';
+
+const evt = createEvent.transactionStart('checkout', { total: 0 });
+
+matchEvent(evt)
+  .onTransactionStart(e => console.log(e.transactionName))
+  .execute();
+```
+
 ## API Reference
 
 ### SagaManager
 
 - `static create<TState>(initialState: TState): SagaManager<TState>`
-- `createTransaction<TPayload>(name: string): Transaction<TState, TPayload>`
-- `use<TPayload>(middleware: Middleware<TState, TPayload>): void`
-- `on(event: string, callback: Listener): void`
+- `createTransaction<TPayload = unknown>(name: string): TransactionBuilder<TState, TPayload>`
+- `createVoidTransaction(name: string): Transaction<TState, void>`
+- `use(middleware: AnyMiddleware<TState>): void`
+- `onEvent(eventType: string, listener: SagaEventListener): void` _(replaces deprecated `on` method)_
 - `getState(): TState`
 - `undo(): void`
 - `redo(): void`
