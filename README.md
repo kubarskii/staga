@@ -235,12 +235,14 @@ try {
 ### SagaManager
 
 - `static create<TState>(initialState: TState): SagaManager<TState>`
-- `createTransaction<TPayload>(name: string): Transaction<TState, TPayload>`
+- `createTransaction<TPayload>(name: string): TransactionBuilder<TState, TPayload>`
 - `use<TPayload>(middleware: Middleware<TState, TPayload>): void`
 - `on(event: string, callback: Listener): void`
 - `getState(): TState`
 - `undo(): void`
 - `redo(): void`
+
+The `createTransaction` method returns a `TransactionBuilder`, allowing you to configure steps before running the transaction.
 
 ### Transaction
 
