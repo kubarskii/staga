@@ -152,22 +152,31 @@ saga.use(async (ctx, next) => {
 Listen to transaction lifecycle events:
 
 ```typescript
-saga.on('transaction:start', (name, payload) => {
-  console.log(`Transaction ${name} started`);
+import {
+  TransactionStartEvent,
+  TransactionSuccessEvent,
+  TransactionFailEvent,
+  StepRetryEvent,
+} from 'staga';
+
+saga.onEvent('transaction:start', (event: TransactionStartEvent) => {
+  console.log(`Transaction ${event.transactionName} started`);
 });
 
-saga.on('transaction:success', (name, payload) => {
-  console.log(`Transaction ${name} completed`);
+saga.onEvent('transaction:success', (event: TransactionSuccessEvent) => {
+  console.log(`Transaction ${event.transactionName} completed`);
 });
 
-saga.on('transaction:fail', (name, error) => {
-  console.log(`Transaction ${name} failed:`, error);
+saga.onEvent('transaction:fail', (event: TransactionFailEvent) => {
+  console.log(`Transaction ${event.transactionName} failed:`, event.error);
 });
 
-saga.on('step:retry', (stepName, attempt) => {
-  console.log(`Step ${stepName} retry attempt ${attempt}`);
+saga.onEvent('step:retry', (event: StepRetryEvent) => {
+  console.log(`Step ${event.stepName} retry attempt ${event.attempt}`);
 });
 ```
+
+Note: `saga.on` is deprecated in favor of `saga.onEvent`.
 
 ## Advanced Usage
 
