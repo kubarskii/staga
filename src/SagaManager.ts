@@ -1,7 +1,7 @@
 import type { EventName, EventArgs, Listener, AnyMiddleware, AnyEventListener, SagaEventListener, AnySagaEventListener, AnySagaEvent, TypedEventListener, SagaEvent } from './types';
 import { StateManager, type StateManagerOptions } from './StateManager';
 import { Transaction, TransactionBuilder } from './Transaction';
-import { Observable, ReactiveSelectorFactory, ComputedValue, type ReactiveValue, type ReactiveSelector } from './ReactiveSelectors';
+import { Observable, ReactiveSelectorFactory, ComputedValue, type ReactiveValue, type ReactiveSelector, deepEqual } from './ReactiveSelectors';
 import { CompositionBuilder, TransactionComposer } from './TransactionComposition';
 import { EventReplayManager, type RecordedEvent, type EventSession, type ReplayOptions } from './EventReplay';
 
@@ -365,16 +365,16 @@ export class SagaManager<TState extends object> {
    * Setup state change watching for reactive selectors
    */
   private setupStateWatcher(): void {
-    // Watch for state changes and update reactive state
-    let currentState = this._stateManager.getState();
+    // Keep a cloned snapshot to detect deep changes
+    let currentState = structuredClone(this._stateManager.getState());
 
-    // Use polling approach for now - in a production system, this could be 
+    // Use polling approach for now - in a production system, this could be
     // replaced with proper state change notifications
     const checkForChanges = () => {
       const newState = this._stateManager.getState();
-      if (newState !== currentState) {
-        currentState = newState;
-        this.reactiveState.set(newState);
+      if (!deepEqual(newState, currentState)) {
+        currentState = structuredClone(newState);
+        this.reactiveState.set(currentState);
       }
     };
 
