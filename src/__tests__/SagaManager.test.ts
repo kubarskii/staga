@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SagaManager } from '../SagaManager';
+import type { AnySagaEvent, SagaEvent } from '../types';
 
 interface TestState {
     count: number;
@@ -34,6 +35,51 @@ describe('SagaManager', () => {
         saga.emit('test:event', 'arg1', 'arg2');
 
         expect(listener).toHaveBeenCalledWith('arg1', 'arg2');
+    });
+
+    it('should remove legacy event listeners', () => {
+        const listener = vi.fn();
+        const off = saga.on('test:event', listener);
+
+        off();
+        saga.emit('test:event', 'arg1');
+
+        expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('should remove saga event listeners', () => {
+        const listener = vi.fn<
+            (event: Extract<
+                SagaEvent<unknown>,
+                { type: 'transaction:start' }
+            >) => void
+        >();
+        const off = saga.onEvent('transaction:start', listener);
+
+        off();
+        saga.emitSagaEvent({
+            type: 'transaction:start',
+            transactionName: 'tx',
+            payload: null,
+            timestamp: Date.now()
+        });
+
+        expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('should remove any-event listeners', () => {
+        const listener = vi.fn<(event: AnySagaEvent) => void>();
+        const off = saga.onAnyEvent(listener);
+
+        off();
+        saga.emitSagaEvent({
+            type: 'transaction:start',
+            transactionName: 'tx',
+            payload: null,
+            timestamp: Date.now()
+        });
+
+        expect(listener).not.toHaveBeenCalled();
     });
 
     it('should support middleware', () => {

@@ -13,7 +13,7 @@ export class SagaManager<TState extends object> {
   private middleware: AnyMiddleware<TState>[] = [];
 
   // Redux-style event listeners for better type safety
-  private typedListeners: Map<AnySagaEvent['type'], AnySagaEventListener[]> = new Map();
+  private typedListeners: Map<AnySagaEvent['type'] | '*', AnySagaEventListener[]> = new Map();
 
   // Reactive state management
   private reactiveState: Observable<TState>;
@@ -109,21 +109,30 @@ export class SagaManager<TState extends object> {
    * Subscribe to events (legacy API) - supports custom events
    * @deprecated Use onEvent() instead for better type safety and payload inference
    */
-  on<T extends EventName>(event: T, callback: Listener<T>): void;
-  on(event: string, callback: (...args: unknown[]) => void): void;
-  on<T extends EventName>(event: T | string, callback: Listener<T> | ((...args: unknown[]) => void)): void {
-    console.warn(`[Staga] The on() method is deprecated. Use onEvent() for better type safety.`);
+  on<T extends EventName>(event: T, callback: Listener<T>): () => void;
+  on(event: string, callback: (...args: unknown[]) => void): () => void;
+  on(event: string, callback: AnyEventListener): () => void {
+    console.warn(
+      `[Staga] The on() method is deprecated. Use onEvent() for better type safety.`
+    );
     const eventKey = String(event);
     if (!this.listeners[eventKey]) {
       this.listeners[eventKey] = [];
     }
-    // Wrapper to match AnyEventListener signature while preserving type safety
-    const anyCallback: AnyEventListener = (...args: unknown[]) => {
-      // Type assertion is safe here because we control the event emission and ensure compatibility
-      const typedArgs = args as EventArgs<T>;
-      callback(...typedArgs);
+    this.listeners[eventKey].push(callback);
+    return () => {
+      const list = this.listeners[eventKey];
+      if (!list) {
+        return;
+      }
+      const index = list.indexOf(callback);
+      if (index !== -1) {
+        list.splice(index, 1);
+      }
+      if (list.length === 0) {
+        delete this.listeners[eventKey];
+      }
     };
-    this.listeners[eventKey].push(anyCallback);
   }
 
   /**
@@ -132,29 +141,57 @@ export class SagaManager<TState extends object> {
   onEvent<T extends AnySagaEvent['type'], TPayload = unknown>(
     eventType: T,
     callback: SagaEventListener<T, TPayload>
-  ): void {
+  ): () => void {
     if (!this.typedListeners.has(eventType)) {
       this.typedListeners.set(eventType, []);
     }
-    // Type-safe wrapper to convert specific event listener to general listener
     const wrappedCallback: AnySagaEventListener = (event: AnySagaEvent) => {
-      if (event.type === eventType) {
-        (callback as any)(event);
+      if (
+        this.isEventOfType<Extract<SagaEvent<TPayload>, { type: T }>>(event, eventType)
+      ) {
+        callback(event);
       }
     };
-    this.typedListeners.get(eventType)!.push(wrappedCallback);
+    const listeners = this.typedListeners.get(eventType)!;
+    listeners.push(wrappedCallback);
+    return () => {
+      const list = this.typedListeners.get(eventType);
+      if (!list) {
+        return;
+      }
+      const index = list.indexOf(wrappedCallback);
+      if (index !== -1) {
+        list.splice(index, 1);
+      }
+      if (list.length === 0) {
+        this.typedListeners.delete(eventType);
+      }
+    };
   }
 
   /**
    * Subscribe to all events with Redux-style typing
    */
-  onAnyEvent<TPayload = unknown>(callback: AnySagaEventListener<TPayload>): void {
-    // Add to a special '*' key for all events
-    if (!this.typedListeners.has('*' as any)) {
-      this.typedListeners.set('*' as any, []);
+  onAnyEvent(callback: AnySagaEventListener): () => void {
+    const key: '*' = '*';
+    if (!this.typedListeners.has(key)) {
+      this.typedListeners.set(key, []);
     }
-    // Cast to AnySagaEventListener for storage compatibility
-    this.typedListeners.get('*' as any)!.push(callback as AnySagaEventListener);
+    const listeners = this.typedListeners.get(key)!;
+    listeners.push(callback);
+    return () => {
+      const list = this.typedListeners.get(key);
+      if (!list) {
+        return;
+      }
+      const index = list.indexOf(callback);
+      if (index !== -1) {
+        list.splice(index, 1);
+      }
+      if (list.length === 0) {
+        this.typedListeners.delete(key);
+      }
+    };
   }
 
   /**
@@ -163,11 +200,37 @@ export class SagaManager<TState extends object> {
   onTypedEvent<TEvent extends AnySagaEvent>(
     eventType: TEvent['type'],
     callback: TypedEventListener<TEvent>
-  ): void {
+  ): () => void {
     if (!this.typedListeners.has(eventType)) {
       this.typedListeners.set(eventType, []);
     }
-    this.typedListeners.get(eventType)!.push(callback as AnySagaEventListener);
+    const wrappedCallback: AnySagaEventListener = (event: AnySagaEvent) => {
+      if (this.isEventOfType<TEvent>(event, eventType)) {
+        callback(event);
+      }
+    };
+    const listeners = this.typedListeners.get(eventType)!;
+    listeners.push(wrappedCallback);
+    return () => {
+      const list = this.typedListeners.get(eventType);
+      if (!list) {
+        return;
+      }
+      const index = list.indexOf(wrappedCallback);
+      if (index !== -1) {
+        list.splice(index, 1);
+      }
+      if (list.length === 0) {
+        this.typedListeners.delete(eventType);
+      }
+    };
+  }
+
+  private isEventOfType<E extends AnySagaEvent>(
+    event: AnySagaEvent,
+    type: E['type']
+  ): event is E {
+    return event.type === type;
   }
 
   /**
@@ -207,7 +270,7 @@ export class SagaManager<TState extends object> {
     }
 
     // Emit to "all events" listeners
-    const allListeners = this.typedListeners.get('*' as any);
+    const allListeners = this.typedListeners.get('*');
     if (allListeners) {
       for (const cb of allListeners) {
         try {
@@ -379,7 +442,13 @@ export class SagaManager<TState extends object> {
     combiner: (...values: { [K in keyof T]: T[K] extends ReactiveValue<infer U> ? U : never }) => any,
     equalityFn?: (a: any, b: any) => boolean
   ): ComputedValue<ReturnType<typeof combiner>> {
-    return new ComputedValue([...sources], (...values) => combiner(...values as any), equalityFn);
+    return new ComputedValue(
+      [...sources],
+      (
+        ...values: { [K in keyof T]: T[K] extends ReactiveValue<infer U> ? U : never }
+      ) => combiner(...values),
+      equalityFn
+    );
   }
 
   /**
@@ -524,8 +593,6 @@ export class SagaManager<TState extends object> {
    * Start replaying events
    */
   async startReplay(options?: ReplayOptions): Promise<void> {
-    // Set up event handlers for replay
-    this.setupReplayHandlers();
     return this.replayManager.getReplayer().startReplay(options);
   }
 
@@ -557,37 +624,4 @@ export class SagaManager<TState extends object> {
     }
   }
 
-  /**
- * Setup replay event handlers
- */
-  private setupReplayHandlers(): void {
-    const replayer = this.replayManager.getReplayer();
-
-    // Handle transaction events during replay
-    replayer.onEventType('transaction:start', async (event) => {
-      const sagaEvent = event as any;
-      console.log(`[Replay] Starting transaction: ${sagaEvent.transactionName || 'unknown'}`);
-    });
-
-    replayer.onEventType('transaction:success', async (event) => {
-      const sagaEvent = event as any;
-      console.log(`[Replay] Transaction completed: ${sagaEvent.transactionName || 'unknown'}`);
-    });
-
-    replayer.onEventType('transaction:fail', async (event) => {
-      const sagaEvent = event as any;
-      console.log(`[Replay] Transaction failed: ${sagaEvent.transactionName || 'unknown'}`);
-    });
-
-    // Handle step events during replay
-    replayer.onEventType('step:start', async (event) => {
-      const sagaEvent = event as any;
-      console.log(`[Replay] Step started: ${sagaEvent.stepName || 'unknown'}`);
-    });
-
-    replayer.onEventType('step:success', async (event) => {
-      const sagaEvent = event as any;
-      console.log(`[Replay] Step completed: ${sagaEvent.stepName || 'unknown'}`);
-    });
-  }
 }
