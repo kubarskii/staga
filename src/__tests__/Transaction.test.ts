@@ -158,6 +158,18 @@ describe('Transaction', () => {
                 'transaction:rollback'
             ]);
         });
+
+        it('should remove snapshot after successful execution', async () => {
+            const initialSnapshots = stateManager.snapshotsLength;
+
+            transaction.addStep('increment', (state) => {
+                state.counter += 1;
+            });
+
+            await transaction.run({});
+
+            expect(stateManager.snapshotsLength).toBe(initialSnapshots);
+        });
     });
 
     describe('retry mechanism', () => {
