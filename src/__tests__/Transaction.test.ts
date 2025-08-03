@@ -201,7 +201,9 @@ describe('Transaction', () => {
             // Undo stack should remain empty since state hasn't truly changed
             expect(complexSaga.stateManager.undoStackLength).toBe(0);
 
-          it('should remove snapshot after successful execution', async () => {
+        });
+
+        it('should remove snapshot after successful execution', async () => {
             const initialSnapshots = stateManager.snapshotsLength;
 
             transaction.addStep('increment', (state) => {
