@@ -33,6 +33,10 @@ describe('Middleware', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    saga.dispose();
+  });
+
   describe('createPersistenceMiddleware', () => {
     it('should save state to localStorage after successful transaction', async () => {
       const middleware = createPersistenceMiddleware<TestState>('test-key');

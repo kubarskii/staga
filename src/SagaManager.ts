@@ -25,6 +25,9 @@ export class SagaManager<TState extends object> {
   // Event replay system
   private replayManager: EventReplayManager<unknown>;
 
+  // Interval ID for state change watcher
+  private stateWatchInterval: ReturnType<typeof setInterval> | null = null;
+
   // Expose StateManager for testing without type casting
   public get stateManager(): StateManager<TState> {
     return this._stateManager;
@@ -318,7 +321,17 @@ export class SagaManager<TState extends object> {
     });
 
     // Also check periodically (fallback)
-    setInterval(checkForChanges, 100);
+    this.stateWatchInterval = setInterval(checkForChanges, 100);
+  }
+
+  /**
+   * Clean up resources used by the saga manager
+   */
+  dispose(): void {
+    if (this.stateWatchInterval !== null) {
+      clearInterval(this.stateWatchInterval);
+      this.stateWatchInterval = null;
+    }
   }
 
   // ===== REACTIVE SELECTOR METHODS =====

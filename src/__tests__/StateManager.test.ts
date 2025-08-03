@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StateManager } from '../StateManager';
 
 interface TestState {
@@ -67,5 +67,19 @@ describe('StateManager', () => {
         // Should not be able to redo to state1 anymore
         stateManager.redo();
         expect(stateManager.getState()).toEqual(state2);
+    });
+
+    it('should respect custom clone function', () => {
+        const customClone = vi.fn(<T>(value: T) => JSON.parse(JSON.stringify(value)) as T);
+        const manager = new StateManager(initialState, { clone: customClone });
+
+        const newState = { count: 1, name: 'updated' };
+        manager.setState(newState);
+        manager.createSnapshot();
+        manager.undo();
+        manager.redo();
+
+        // constructor + setState (2) + createSnapshot + undo + redo
+        expect(customClone).toHaveBeenCalledTimes(6);
     });
 });

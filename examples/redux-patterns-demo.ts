@@ -421,5 +421,5 @@ export {
 
 // Run demo if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-    runReduxPatternsDemo().catch(console.error);
+    runReduxPatternsDemo().catch(console.error).finally(() => saga.dispose());
 }

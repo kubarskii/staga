@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SagaManager, createPersistenceMiddleware, createLoggingMiddleware, createTimingMiddleware } from '../index';
 
 interface EcommerceState {
@@ -34,6 +34,10 @@ describe('Integration Tests', () => {
   beforeEach(() => {
     saga = SagaManager.create(initialState);
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    saga.dispose();
   });
 
   describe('E-commerce Order Processing', () => {
