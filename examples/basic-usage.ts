@@ -1,7 +1,15 @@
 /**
  * Basic usage example for Staga library
  */
-import { SagaManager, createLoggingMiddleware, createPersistenceMiddleware } from '../src/index.js';
+import {
+    SagaManager,
+    createLoggingMiddleware,
+    createPersistenceMiddleware,
+    type TransactionStartEvent,
+    type TransactionSuccessEvent,
+    type TransactionFailEvent,
+    type StepRetryEvent,
+} from '../src/index.js';
 
 // Define application state
 interface AppState {
@@ -23,21 +31,21 @@ const saga = SagaManager.create(initialState);
 // Add middleware
 saga.use(createLoggingMiddleware());
 
-// Set up event listeners
-saga.on('transaction:start', (name, payload) => {
-    console.log(`🚀 Starting transaction: ${name}`, payload);
+// Set up event listeners (store disposers for cleanup)
+const disposeTransactionStart = saga.onEvent('transaction:start', (event: TransactionStartEvent) => {
+    console.log(`🚀 Starting transaction: ${event.transactionName}`, event.payload);
 });
 
-saga.on('transaction:success', (name) => {
-    console.log(`✅ Transaction completed: ${name}`);
+const disposeTransactionSuccess = saga.onEvent('transaction:success', (event: TransactionSuccessEvent) => {
+    console.log(`✅ Transaction completed: ${event.transactionName}`);
 });
 
-saga.on('transaction:fail', (name, error) => {
-    console.log(`❌ Transaction failed: ${name}`, error);
+const disposeTransactionFail = saga.onEvent('transaction:fail', (event: TransactionFailEvent) => {
+    console.log(`❌ Transaction failed: ${event.transactionName}`, event.error);
 });
 
-saga.on('step:retry', (stepName, attempt) => {
-    console.log(`🔄 Retrying step: ${stepName} (attempt ${attempt})`);
+const disposeStepRetry = saga.onEvent('step:retry', (event: StepRetryEvent) => {
+    console.log(`🔄 Retrying step: ${event.stepName} (attempt ${event.attempt})`);
 });
 
 // Create a user registration transaction
@@ -211,6 +219,12 @@ async function runExamples() {
     }
 
     console.log('\nFinal state:', saga.getState());
+
+    // Clean up listeners once we're done to prevent memory leaks
+    disposeTransactionStart();
+    disposeTransactionSuccess();
+    disposeTransactionFail();
+    disposeStepRetry();
 }
 
 // Run the examples
