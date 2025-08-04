@@ -48,9 +48,9 @@ describe('Integration Tests', () => {
 
       // Track events
       const events: string[] = [];
-      saga.on('transaction:start', (name) => events.push(`start:${name}`));
-      saga.on('transaction:success', (name) => events.push(`success:${name}`));
-      saga.on('step:success', (stepName) => events.push(`step:${stepName}`));
+      saga.onSagaEvent('transaction:start', (event) => events.push(`start:${event.transactionName}`));
+      saga.onSagaEvent('transaction:success', (event) => events.push(`success:${event.transactionName}`));
+      saga.onSagaEvent('step:success', (event) => events.push(`step:${event.stepName}`));
 
       // Create order processing transaction with automatic payload inference
       const orderTransaction = saga
@@ -180,8 +180,8 @@ describe('Integration Tests', () => {
     it('should rollback completely on payment failure', async () => {
       // Track rollback events using new event system
       const rollbackEvents: string[] = [];
-      saga.onEvent('step:rollback', (event) => rollbackEvents.push(`rollback:${event.stepName}`));
-      saga.onEvent('transaction:rollback', (event) => rollbackEvents.push(`transaction-rollback:${event.transactionName}`));
+      saga.onSagaEvent('step:rollback', (event) => rollbackEvents.push(`rollback:${event.stepName}`));
+      saga.onSagaEvent('transaction:rollback', (event) => rollbackEvents.push(`transaction-rollback:${event.transactionName}`));
 
       // Create transaction that will fail at payment
       const failingTransaction = saga
@@ -305,8 +305,8 @@ describe('Integration Tests', () => {
         }, undefined, { retries: 3, timeout: 1000 });
 
       const retryEvents: string[] = [];
-      saga.on('step:retry', (stepName, attempt) => {
-        retryEvents.push(`${stepName}:${attempt}`);
+      saga.onSagaEvent('step:retry', (event) => {
+        retryEvents.push(`${event.stepName}:${event.attempt}`);
       });
 
       await networkTransaction.run({});

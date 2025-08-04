@@ -1,24 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>Staga Demo</title>
   <style>
-    body { font-family: sans-serif; padding: 2rem; }
-    section { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ccc; }
-    pre { background: #f0f0f0; padding: 1rem; }
-    button { margin-right: .5rem; }
-    nav ul { line-height: 1.8; }
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+    }
+
+    section {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #ccc;
+    }
+
+    pre {
+      background: #f0f0f0;
+      padding: 1rem;
+    }
+
+    button {
+      margin-right: .5rem;
+    }
+
+    nav ul {
+      line-height: 1.8;
+    }
   </style>
   <script src="../dist/index.global.js"></script>
 </head>
+
 <body>
-  <h1>Staga Demo</h1>
-  <p>Examples of core Staga features. Use the links below to jump to a section.</p>
+  <h1>Staga Comprehensive Demo</h1>
+  <p>Explore core Staga features below. This demo uses only the modern event API (onSagaEvent/emitSagaEvent) and
+    statekit signals/streams.</p>
   <nav>
     <ul>
       <li><a href="#state-management">State Management</a></li>
       <li><a href="#reactive-selectors">Reactive Selectors</a></li>
+      <li><a href="#unified-reactivity">Unified Reactivity</a></li>
       <li><a href="#transactions">Transactions</a></li>
       <li><a href="#event-replay">Event Replay</a></li>
     </ul>
@@ -71,8 +93,8 @@
           item: { price: 75 }
         });
 
-        const balance$ = saga.selectProperty('user').select(u => u.balance);
-        const price$ = saga.selectProperty('item').select(i => i.price);
+        const balance$ = saga.select(s => s.user.balance);
+        const price$ = saga.select(s => s.item.price);
         const canAfford$ = saga.computed(balance$, price$, (b, p) => b >= p);
 
         balance$.subscribe(b => document.getElementById('rs-balance').textContent = b);
@@ -96,6 +118,78 @@
             user: s.user
           });
         };
+      })();
+    </script>
+  </section>
+
+  <section id="unified-reactivity">
+    <h2>Unified Reactivity (State + Events)</h2>
+    <button id="ur-emit-action">Emit User Action</button>
+    <button id="ur-emit-notification">Emit Notification</button>
+    <button id="ur-change-state">Change State</button>
+    <div>Events received: <span id="ur-event-count">0</span></div>
+    <div>Current state value: <span id="ur-state-value">waiting...</span></div>
+    <pre id="ur-log"></pre>
+    <script>
+      (() => {
+        const saga = window.Staga.SagaManager.create({
+          value: 42,
+          events: []
+        });
+
+        let eventCount = 0;
+        const log = msg => {
+          const pre = document.getElementById('ur-log');
+          pre.textContent += msg + '\n';
+        };
+
+        // State reactivity via Signals (exposed here with value-based subscribe)
+        const state$ = saga.select(s => s);
+        state$.subscribe(state => {
+          document.getElementById('ur-state-value').textContent = state.value;
+          log(`🔄 State changed: value=${state.value}`);
+        });
+
+        // Event reactivity via Stream (temporal events)
+        const userActionStream = saga.onEventStream('userAction');
+        userActionStream.subscribe(event => {
+          eventCount++;
+          document.getElementById('ur-event-count').textContent = eventCount;
+          log(`🔥 User action: ${JSON.stringify(event.payload)}`);
+        });
+
+        const notificationStream = saga.onEventStream('notification');
+        notificationStream.subscribe(event => {
+          eventCount++;
+          document.getElementById('ur-event-count').textContent = eventCount;
+          log(`📢 Notification: ${JSON.stringify(event.payload)}`);
+        });
+
+        // All events stream (wildcard listener)
+        const allEventsStream = saga.onAllEventsStream();
+        allEventsStream.subscribe(event => {
+          log(`📡 Any event detected: ${event.type}`);
+        });
+
+        document.getElementById('ur-emit-action').onclick = () => {
+          saga.emitSagaEvent({ type: 'userAction', payload: { action: 'click', timestamp: Date.now() }, timestamp: Date.now() });
+        };
+
+        document.getElementById('ur-emit-notification').onclick = () => {
+          saga.emitSagaEvent({ type: 'notification', payload: { kind: 'info', message: 'Hello reactive world!' }, timestamp: Date.now() });
+        };
+
+        document.getElementById('ur-change-state').onclick = () => {
+          const current = saga.getState();
+          saga.stateManager.setState({
+            ...current,
+            value: current.value + 10
+          });
+        };
+
+        log('✅ Unified reactive system ready!');
+        log('🎯 State changes = Signal (current value)');
+        log('🔥 Events = Stream (temporal)');
       })();
     </script>
   </section>
@@ -139,7 +233,7 @@
           }
         };
 
-        const balance$ = saga.selectProperty('user').select(u => u.balance);
+        const balance$ = saga.select(s => s.user.balance);
         balance$.subscribe(b => document.getElementById('tr-balance').textContent = b);
       })();
     </script>
@@ -185,9 +279,407 @@
           log('replay started');
         };
 
-        saga.on('replay:finished', () => log('replay finished'));
+        // Modern reactive approach instead of deprecated on() method
+        const replayFinishedStream = saga.onEventStream('replay:finished');
+        replayFinishedStream.subscribe(() => log('replay finished'));
+      })();
+    </script>
+  </section>
+
+  <section id="ai-agent">
+    <h2>AI Agent (with Transactions)</h2>
+    <div style="display:flex; gap:1rem; align-items:center; margin-bottom:.5rem;">
+      <input id="ai-input" type="text" placeholder="Ask something..." style="flex:1; padding:.5rem;" />
+      <button id="ai-send">Send</button>
+      <span id="ai-status">idle</span>
+    </div>
+    <div id="ai-chat" style="border:1px solid #ddd; border-radius:8px; padding:1rem; min-height:120px;"></div>
+    <pre id="ai-log" style="margin-top:1rem;"></pre>
+    <script>
+      (() => {
+        /**
+         * Simple AI agent demo that uses a Transaction to safely process a chat turn.
+         * Steps can timeout/fail; on failure we auto-rollback enqueued messages.
+         */
+        const saga = window.Staga.SagaManager.create({
+          messages: [], // { role: 'user'|'assistant', text: string }
+          pendingAssistant: '',
+          status: 'idle',
+          error: null
+        });
+
+        const chatEl = document.getElementById('ai-chat');
+        const statusEl = document.getElementById('ai-status');
+        const logEl = document.getElementById('ai-log');
+
+        const render = () => {
+          const s = saga.getState();
+          statusEl.textContent = s.status + (s.error ? ` (error: ${s.error})` : '');
+          chatEl.innerHTML = s.messages.map(m => `<div><strong>${m.role}:</strong> ${escapeHtml(m.text)}</div>`).join('');
+        };
+
+        function escapeHtml(str) {
+          return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        }
+
+        // Rerender on state changes
+        saga.select(s => s).subscribe(render);
+        render();
+
+        // Log transaction lifecycle
+        saga.onEventStream('transaction:start').subscribe(e => log(`[tx] start: ${e.transactionName}`));
+        saga.onEventStream('step:start').subscribe(e => log(`  step:start: ${e.stepName}`));
+        saga.onEventStream('step:success').subscribe(e => log(`  step:success: ${e.stepName}`));
+        saga.onEventStream('step:retry').subscribe(e => log(`  step:retry: ${e.stepName} attempt=${e.attempt}`));
+        saga.onEventStream('transaction:success').subscribe(e => log(`[tx] success: ${e.transactionName} (${e.duration}ms)`));
+        saga.onEventStream('transaction:rollback').subscribe(e => log(`[tx] rollback: ${e.transactionName}`));
+        saga.onEventStream('transaction:fail').subscribe(e => log(`[tx] fail: ${e.transactionName} - ${e.error?.message || 'unknown'}`));
+
+        function log(msg) {
+          logEl.textContent += msg + '\n';
+        }
+
+        // Simulated AI call that may timeout/fail
+        function fakeAiCall(prompt, { timeoutMs = 800, failRate = 0.25 } = {}) {
+          return new Promise((resolve, reject) => {
+            const latency = 200 + Math.random() * 400;
+            const timer = setTimeout(() => reject(new Error(`AI timeout after ${timeoutMs}ms`)), timeoutMs);
+            setTimeout(() => {
+              if (Math.random() < failRate) {
+                clearTimeout(timer);
+                reject(new Error('Upstream AI error'));
+              } else {
+                clearTimeout(timer);
+                resolve(`Echo: ${prompt}`);
+              }
+            }, latency);
+          });
+        }
+
+        // Define a transaction for one chat turn
+        const sendTx = saga
+          .createTransaction('ai-chat-turn')
+          .addStep('validate-input', (state, payload) => {
+            const text = (payload && payload.text || '').trim();
+            if (!text) throw new Error('Empty message');
+          })
+          .addStep('enqueue-user', (state, payload) => {
+            saga.stateManager.setState({
+              ...saga.getState(),
+              messages: [...saga.getState().messages, { role: 'user', text: payload.text }],
+              status: 'thinking',
+              error: null
+            });
+          }, (state, payload) => { // compensation
+            const s = saga.getState();
+            const msgs = s.messages.slice();
+            // remove last user message if it matches the payload
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              if (msgs[i].role === 'user' && msgs[i].text === payload.text) { msgs.splice(i, 1); break; }
+            }
+            saga.stateManager.setState({ ...s, messages: msgs });
+          })
+          .addStep('call-ai', async (state, payload) => {
+            const answer = await fakeAiCall(payload.text, { timeoutMs: 1200, failRate: 0.3 });
+            saga.stateManager.setState({ ...saga.getState(), pendingAssistant: answer });
+          }, async () => {
+            saga.stateManager.setState({ ...saga.getState(), pendingAssistant: '' });
+          })
+          .addStep('enqueue-assistant', (state) => {
+            const s = saga.getState();
+            const answer = s.pendingAssistant || '(no answer)';
+            saga.stateManager.setState({
+              ...s,
+              messages: [...s.messages, { role: 'assistant', text: answer }],
+              pendingAssistant: ''
+            });
+          }, () => {
+            const s = saga.getState();
+            const msgs = s.messages.slice();
+            // remove last assistant message
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              if (msgs[i].role === 'assistant') { msgs.splice(i, 1); break; }
+            }
+            saga.stateManager.setState({ ...s, messages: msgs });
+          })
+          .addStep('persist', async () => {
+            // simulate persistence with possible failure
+            await new Promise((res) => setTimeout(res, 120));
+            if (Math.random() < 0.2) throw new Error('Persist failed');
+          });
+
+        document.getElementById('ai-send').onclick = async () => {
+          const input = document.getElementById('ai-input');
+          const text = input.value;
+          try {
+            await sendTx.run({ text });
+            saga.stateManager.setState({ ...saga.getState(), status: 'idle', error: null });
+          } catch (err) {
+            saga.stateManager.setState({ ...saga.getState(), status: 'idle', error: err.message || String(err) });
+          } finally {
+            input.value = '';
+          }
+        };
+      })();
+    </script>
+  </section>
+
+  <section id="tools-pipeline">
+    <h2>Tool Orchestration (multi-call with rollback)</h2>
+    <div style="display:flex; gap:1rem; align-items:center; margin-bottom:.5rem;">
+      <label>Fail step:
+        <select id="tp-fail-step">
+          <option value="">(none)</option>
+          <option>validate:input</option>
+          <option>acquire:rate-limit</option>
+          <option>auth:token</option>
+          <option>cache:read</option>
+          <option>call:fetchUser</option>
+          <option>call:fetchOrders</option>
+          <option>transform:orders</option>
+          <option>call:enrich</option>
+          <option>notify:start</option>
+          <option>audit:begin</option>
+          <option>call:persist</option>
+          <option>index:update</option>
+          <option>audit:commit</option>
+          <option>notify:success</option>
+          <option>release:rate-limit</option>
+          <option>cleanup:ephemeral</option>
+        </select>
+      </label>
+      <label>Random fail rate <input id="tp-fail-rate" type="number" min="0" max="1" step="0.05" value="0.2"
+          style="width:5rem;" /></label>
+      <button id="tp-run">Run pipeline</button>
+      <span id="tp-status">idle</span>
+    </div>
+    <div style="display:flex; gap:1rem;">
+      <pre id="tp-state" style="flex:1; min-height:160px;"></pre>
+      <pre id="tp-log" style="flex:1; min-height:160px;"></pre>
+    </div>
+    <script>
+      (() => {
+        const saga = window.Staga.SagaManager.create({
+          pipeline: { runId: 0 },
+          status: 'idle',
+          error: null
+        });
+
+        const stateEl = document.getElementById('tp-state');
+        const statusEl = document.getElementById('tp-status');
+        const logEl = document.getElementById('tp-log');
+
+        function log(msg) { logEl.textContent += msg + '\n'; }
+        function render() {
+          const s = saga.getState();
+          statusEl.textContent = s.status + (s.error ? ` (error: ${s.error})` : '');
+          stateEl.textContent = JSON.stringify(s.pipeline, null, 2);
+        }
+        saga.select(s => s).subscribe(render); render();
+
+        // Simulated tools
+        function simulateTool(name, payload, { delay = 300, failRate = 0.2, failStep = '' } = {}) {
+          return new Promise((resolve, reject) => {
+            setTimeout(() => {
+              if (failStep === name || Math.random() < failRate) {
+                reject(new Error(`${name} failed`));
+              } else {
+                resolve({ tool: name, payload });
+              }
+            }, delay + Math.random() * 300);
+          });
+        }
+
+        // Observe lifecycle
+        saga.onEventStream('transaction:start').subscribe(e => log(`[tx] start: ${e.transactionName}`));
+        saga.onEventStream('step:start').subscribe(e => log(`  step:start: ${e.stepName}`));
+        saga.onEventStream('step:success').subscribe(e => log(`  step:success: ${e.stepName}`));
+        saga.onEventStream('transaction:success').subscribe(e => log(`[tx] success: ${e.transactionName} (${e.duration}ms)`));
+        saga.onEventStream('transaction:rollback').subscribe(e => log(`[tx] rollback: ${e.transactionName}`));
+        saga.onEventStream('transaction:fail').subscribe(e => log(`[tx] fail: ${e.transactionName} - ${e.error?.message || 'unknown'}`));
+
+        const builder = saga
+          .createTransaction('tool-pipeline')
+          .addStep('validate:input', (state, payload) => {
+            // no-op validation placeholder; can fail via selector
+            if (payload.failValidation) throw new Error('Validation failed');
+          })
+          .addStep('acquire:rate-limit', () => {
+            const s = saga.getState();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, rateLimit: true }, status: 'running', error: null });
+          }, () => {
+            const s = saga.getState();
+            const { rateLimit, ...rest } = s.pipeline;
+            saga.stateManager.setState({ ...s, pipeline: rest });
+          })
+          .addStep('auth:token', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            await simulateTool('auth:token', {}, { failRate, failStep });
+            const s = saga.getState();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, token: 't-' + Math.random().toString(36).slice(2, 8) } });
+          }, () => {
+            const s = saga.getState();
+            const { token, ...rest } = s.pipeline;
+            saga.stateManager.setState({ ...s, pipeline: rest });
+          })
+          .addStep('cache:read', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            await simulateTool('cache:read', {}, { failRate, failStep });
+            const s = saga.getState();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, cache: { key: 'user:42', hit: Math.random() < 0.3 } } });
+          }, () => {
+            const s = saga.getState();
+            const { cache, ...rest } = s.pipeline;
+            saga.stateManager.setState({ ...s, pipeline: rest });
+          })
+          .addStep('reserve-slot', (state, payload) => {
+            const s = saga.getState();
+            saga.stateManager.setState({
+              ...s,
+              status: 'running',
+              error: null,
+              pipeline: { runId: Date.now() }
+            });
+          }, () => {
+            const s = saga.getState();
+            saga.stateManager.setState({ ...s, status: 'idle', pipeline: { runId: 0 } });
+          })
+          .addStep('call:fetchUser', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            const res = await simulateTool('call:fetchUser', { userId: 42 }, { failRate, failStep });
+            const s = saga.getState();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, user: { id: 42, name: 'Ada' } } });
+          }, () => {
+            const s = saga.getState();
+            const { user, ...rest } = s.pipeline;
+            saga.stateManager.setState({ ...s, pipeline: rest });
+          })
+          .addStep('call:fetchOrders', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            await simulateTool('call:fetchOrders', { userId: 42 }, { failRate, failStep });
+            const s = saga.getState();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, orders: [{ id: 1, total: 99.5 }] } });
+          }, () => {
+            const s = saga.getState();
+            const { orders, ...rest } = s.pipeline;
+            saga.stateManager.setState({ ...s, pipeline: rest });
+          }, { retries: 1, timeout: 1500 })
+          .addStep('transform:orders', (state, payload) => {
+            const s = saga.getState();
+            const total = (s.pipeline.orders || []).reduce((sum, o) => sum + o.total, 0);
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, transformed: true, totals: { total } } });
+          }, () => {
+            const s = saga.getState();
+            const { transformed, totals, ...rest } = s.pipeline;
+            saga.stateManager.setState({ ...s, pipeline: rest });
+          })
+          .addStep('call:enrich', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            await simulateTool('call:enrich', {}, { failRate, failStep });
+            const s = saga.getState();
+            const total = (s.pipeline.orders || []).reduce((sum, o) => sum + o.total, 0);
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, summary: { total, count: (s.pipeline.orders || []).length } } });
+          }, () => {
+            const s = saga.getState();
+            const { summary, ...rest } = s.pipeline;
+            saga.stateManager.setState({ ...s, pipeline: rest });
+          })
+          .addStep('notify:start', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            await simulateTool('notify:start', {}, { failRate, failStep });
+            const s = saga.getState();
+            const list = (s.pipeline.notifications || []).slice();
+            list.push('start');
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, notifications: list } });
+          }, () => {
+            const s = saga.getState();
+            const list = (s.pipeline.notifications || []).slice();
+            if (list[list.length - 1] === 'start') list.pop();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, notifications: list } });
+          })
+          .addStep('audit:begin', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            await simulateTool('audit:begin', {}, { failRate, failStep });
+            const s = saga.getState();
+            const audit = (s.pipeline.audit || []).slice();
+            audit.push({ t: Date.now(), event: 'begin' });
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, audit } });
+          }, () => {
+            const s = saga.getState();
+            const audit = (s.pipeline.audit || []).slice();
+            audit.pop();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, audit } });
+          })
+          .addStep('call:persist', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            await simulateTool('call:persist', state.pipeline, { failRate, failStep });
+          })
+          .addStep('index:update', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            await simulateTool('index:update', {}, { failRate, failStep });
+            const s = saga.getState();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, indexed: true } });
+          }, () => {
+            const s = saga.getState();
+            const { indexed, ...rest } = s.pipeline;
+            saga.stateManager.setState({ ...s, pipeline: rest });
+          })
+          .addStep('audit:commit', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            await simulateTool('audit:commit', {}, { failRate, failStep });
+            const s = saga.getState();
+            const audit = (s.pipeline.audit || []).slice();
+            audit.push({ t: Date.now(), event: 'commit' });
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, audit } });
+          }, () => {
+            const s = saga.getState();
+            const audit = (s.pipeline.audit || []).slice();
+            if (audit[audit.length - 1]?.event === 'commit') audit.pop();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, audit } });
+          })
+          .addStep('notify:success', async (state, payload) => {
+            const { failStep, failRate } = payload;
+            await simulateTool('notify:success', {}, { failRate, failStep });
+            const s = saga.getState();
+            const list = (s.pipeline.notifications || []).slice();
+            list.push('success');
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, notifications: list } });
+          }, () => {
+            const s = saga.getState();
+            const list = (s.pipeline.notifications || []).slice();
+            if (list[list.length - 1] === 'success') list.pop();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, notifications: list } });
+          })
+          .addStep('release:rate-limit', () => {
+            const s = saga.getState();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, rateLimit: false } });
+          }, () => {
+            const s = saga.getState();
+            saga.stateManager.setState({ ...s, pipeline: { ...s.pipeline, rateLimit: true } });
+          })
+          .addStep('cleanup:ephemeral', () => {
+            const s = saga.getState();
+            const { token, cache, transformed, totals, ...rest } = s.pipeline;
+            saga.stateManager.setState({ ...s, pipeline: rest });
+          });
+
+        document.getElementById('tp-run').onclick = async () => {
+          logEl.textContent = '';
+          const failStep = document.getElementById('tp-fail-step').value;
+          const failRate = parseFloat(document.getElementById('tp-fail-rate').value || '0');
+          try {
+            await builder.run({ failStep, failRate });
+            saga.stateManager.setState({ ...saga.getState(), status: 'idle' });
+          } catch (err) {
+            saga.stateManager.setState({ ...saga.getState(), status: 'idle', error: err.message || String(err) });
+          }
+        };
       })();
     </script>
   </section>
 </body>
+
 </html>

@@ -13,7 +13,7 @@ export function createPersistenceMiddleware<TState extends object>(
             const state: TState = ctx.getState();
             localStorage.setItem(storageKey, JSON.stringify(state));
         } catch (err) {
-            console.error("[Persistence] Failed to save state:", err);
+            console.error('[Persistence] Failed to save state:', err);
         }
     };
 }

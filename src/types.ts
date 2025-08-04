@@ -12,6 +12,10 @@ export interface StepOptions {
     timeout?: number;
 }
 
+export interface TransactionOptions {
+    disableAutoRollback?: boolean;
+}
+
 export interface SagaStep<TState extends object, TPayload> {
     name: string;
     execute: StepFunction<TState, TPayload>;

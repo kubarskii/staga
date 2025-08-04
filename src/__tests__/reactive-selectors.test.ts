@@ -17,7 +17,7 @@ describe('Reactive selectors', () => {
     });
 
     it('should update subscribers when state changes in a transaction', async () => {
-        const orderCount$ = saga.selectProperty('orders').select(o => o.length);
+        const orderCount$ = saga.select(state => state.orders.length);
         const updates: number[] = [];
         orderCount$.subscribe(value => updates.push(value));
 
@@ -30,6 +30,6 @@ describe('Reactive selectors', () => {
         await new Promise(resolve => setTimeout(resolve, 150));
 
         expect(orderCount$.value).toBe(1);
-        expect(updates).toEqual([1]);
+        expect(updates).toEqual([0, 1]); // Now includes initial value
     });
 });

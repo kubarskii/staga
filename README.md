@@ -1,364 +1,155 @@
 # Staga
 
-A TypeScript library for managing state transactions with the saga pattern, featuring rollbacks, retries, middleware support, and undo/redo functionality.
+TypeScript-first transactions and state orchestration with automatic rollback, retries, typed events, and reactive selectors. Now powered by a modern state core (statekit) with Signals and Streams.
 
-## Features
+## Highlights
 
-- 🔄 **Transaction Management**: Execute multiple steps as atomic operations with automatic rollback on failure
-- ⏪ **Undo/Redo**: Built-in undo/redo functionality for state management
-- 🔁 **Retry Logic**: Configurable retry mechanisms for failed steps
-- ⏱️ **Timeout Support**: Set timeouts for individual steps
-- 🔌 **Middleware**: Extensible middleware system for cross-cutting concerns
-- 💾 **Persistence**: Built-in persistence middleware for state storage
-- 📦 **TypeScript**: Full TypeScript support with strong typing
-- 🎯 **Event System**: Listen to transaction and step lifecycle events
-- ⚛️ **Reactive Selectors**: Derive computed state that updates automatically
-- 🔗 **Transaction Composition**: Combine multiple transactions into complex workflows
-- 📜 **Event Replay**: Record and replay events for debugging or testing
-- 📝 **Redux-style Action Creators**: Generate structured step actions
-- 🛡️ **Type-safe Event Helpers**: Create and match events with full type safety
+- 🔄 Transactions with automatic rollback and per-step compensation
+- 🔁 Retries and ⏱️ timeouts per step
+- 🧩 Middleware (logging, timing, persistence)
+- 🧠 Reactive selectors (Signals) and event Streams
+- ⏪ Undo/Redo and snapshots in `StateManager`
+- 📡 Typed event API (`onSagaEvent`, `onAnyEvent`) and Streams (`onEventStream`)
+- 🧪 Event recording and replay
 
-## Installation
+## Install
 
 ```bash
 npm install staga
 ```
 
-## Quick Start
+## Quick start
 
-```typescript
+```ts
 import { SagaManager } from 'staga';
 
-// Define your state type
-interface AppState {
-  users: string[];
-  count: number;
-}
+type AppState = { users: string[]; count: number };
 
-// Create a saga manager with initial state
-const saga = SagaManager.create<AppState>({
-  users: [],
-  count: 0
+const saga = SagaManager.create<AppState>({ users: [], count: 0 });
+
+// 1) Reactive selector (value-based subscription)
+const count$ = saga.select(s => s.count);
+const offCount = count$.subscribe(count => console.log('count =', count));
+
+// 2) Typed event subscription
+const offStart = saga.onSagaEvent('transaction:start', (e) => {
+  console.log('TX started:', e.transactionName);
 });
 
-// Create a transaction
-const userTransaction = saga
-  .createTransaction('addUser')
+// 3) Transaction with compensation
+const addUser = saga
+  .createTransaction<{ name: string }>('add-user')
+  .addStep('validate', (state, payload) => {
+    if (!payload.name?.trim()) throw new Error('Name is required');
+  })
   .addStep(
-    'validateUser',
-    async (state, payload: { name: string }) => {
-      if (!payload.name) throw new Error('Name is required');
-    }
-  )
-  .addStep(
-    'addToUsers',
-    async (state, payload) => {
-      state.users.push(payload.name);
-      state.count++;
+    'append-user',
+    (state, payload) => {
+      // mutate via StateManager
+      saga.stateManager.setState({
+        ...saga.getState(),
+        users: [...saga.getState().users, payload.name],
+        count: saga.getState().count + 1,
+      });
     },
-    // Compensation function for rollback
-    async (state, payload) => {
-      const index = state.users.indexOf(payload.name);
-      if (index > -1) {
-        state.users.splice(index, 1);
-        state.count--;
-      }
+    // compensation on rollback
+    (state, payload) => {
+      const s = saga.getState();
+      const users = s.users.slice();
+      const idx = users.lastIndexOf(payload.name);
+      if (idx >= 0) users.splice(idx, 1);
+      saga.stateManager.setState({ ...s, users, count: s.count - 1 });
     },
-    { retries: 3, timeout: 5000 }
+    { retries: 2, timeout: 2000 }
   );
 
-// Execute the transaction
-try {
-  await userTransaction.run({ name: 'John' });
-  console.log('User added successfully');
-} catch (error) {
-  console.error('Transaction failed:', error);
-}
+await addUser.run({ name: 'Ada' });
 ```
 
-## Core Concepts
+## Core concepts
 
 ### StateManager
 
-Manages application state with undo/redo functionality and snapshots:
-
-```typescript
+```ts
 import { StateManager } from 'staga';
 
-const stateManager = new StateManager({ count: 0 });
+const sm = new StateManager({ count: 0 });
 
-// Get current state
-const currentState = stateManager.getState();
+sm.setState({ count: 1 });
+sm.undo();
+sm.redo();
+sm.createSnapshot();
+sm.rollbackToLastSnapshot();
 
-// Update state
-stateManager.setState({ count: 1 });
-
-// Undo/redo
-stateManager.undo();
-stateManager.redo();
-
-// Snapshots for rollback
-stateManager.createSnapshot();
-stateManager.rollbackToLastSnapshot();
+// Reactive selector (value-based)
+const count$ = sm.select(s => s.count);
+const off = count$.subscribe(v => console.log(v));
 ```
 
 ### Transactions
 
-Transactions group multiple steps that execute as an atomic operation:
+```ts
+const transfer = saga
+  .createTransaction<{ amount: number; from: string; to: string }>('transfer')
+  .addStep('debit', (state, p) => {
+    // ...debit logic
+  }, (state, p) => {
+    // ...compensate debit
+  })
+  .addStep('credit', (state, p) => {
+    // ...credit logic
+  }, (state, p) => {
+    // ...compensate credit
+  }, { retries: 3, timeout: 5000 });
 
-```typescript
-const transaction = saga
-  .createTransaction('transfer-money')
-  .addStep(
-    'debit-source',
-    async (state, payload) => {
-      // Debit logic
-    },
-    async (state, payload) => {
-      // Compensation: credit back
-    }
-  )
-  .addStep(
-    'credit-target',
-    async (state, payload) => {
-      // Credit logic
-    },
-    async (state, payload) => {
-      // Compensation: debit back
-    }
-  );
+await transfer.run({ amount: 100, from: 'A', to: 'B' });
+```
 
-await transaction.run({ amount: 100, from: 'A', to: 'B' });
+### Events (typed) and Streams
+
+```ts
+// Typed event listeners
+const offAny = saga.onAnyEvent(e => console.log(e.type));
+const offFail = saga.onSagaEvent('transaction:fail', e => console.error(e.error));
+
+// Stream API (temporal)
+const startStream = saga.onEventStream('transaction:start');
+const offStream = startStream.subscribe(e => console.log('stream start', e.transactionName));
 ```
 
 ### Middleware
 
-Add cross-cutting concerns with middleware:
+```ts
+import { createLoggingMiddleware, createTimingMiddleware, createPersistenceMiddleware } from 'staga';
 
-```typescript
-import { createPersistenceMiddleware, createLoggingMiddleware } from 'staga';
-
-// Add persistence
-saga.use(createPersistenceMiddleware('app-state'));
-
-// Add logging
 saga.use(createLoggingMiddleware());
-
-// Custom middleware
-saga.use(async (ctx, next) => {
-  console.log(`Starting: ${ctx.transaction.name}`);
-  await next();
-  console.log(`Completed: ${ctx.transaction.name}`);
-});
+saga.use(createTimingMiddleware());
+saga.use(createPersistenceMiddleware('app-state'));
 ```
 
-### Event System
+### Event recording and replay
 
-#### onEvent
-
-Listen to specific transaction lifecycle events:
-
-```typescript
-import {
-  TransactionStartEvent,
-  TransactionSuccessEvent,
-  TransactionFailEvent,
-  StepRetryEvent,
-} from 'staga';
-
-// Subscribe and capture disposer
-const offStart = saga.onEvent('transaction:start', (event: TransactionStartEvent) => {
-  console.log(`Transaction ${event.transactionName} started`);
-});
-
-// Later, clean up the listener
-offStart();
-
-saga.onEvent('transaction:success', (event: TransactionSuccessEvent) => {
-  console.log(`Transaction ${event.transactionName} completed`);
-});
-
-saga.onEvent('transaction:fail', (event: TransactionFailEvent) => {
-  console.log(`Transaction ${event.transactionName} failed:`, event.error);
-});
-
-saga.onEvent('step:retry', (event: StepRetryEvent) => {
-  console.log(`Step ${event.stepName} retry attempt ${event.attempt}`);
-});
-```
-
-#### onAnyEvent
-
-Listen to all saga events with a single handler:
-
-```typescript
-const offAny = saga.onAnyEvent((event) => {
-  console.log('Event:', event.type);
-});
-
-// Later, remove the handler
-offAny();
-```
-
-Note: `saga.on` returns a disposer but is considered legacy. Use `saga.onEvent` instead.
-
-## Advanced Usage
-
-### Persistence
-
-```typescript
-import { loadPersistedState, createPersistenceMiddleware } from 'staga';
-
-// Load persisted state
-const initialState = loadPersistedState('my-app', { users: [], count: 0 });
-
-const saga = SagaManager.create(initialState);
-saga.use(createPersistenceMiddleware('my-app'));
-```
-
-### Custom Middleware
-
-```typescript
-function createValidationMiddleware<TState>(): Middleware<TState, any> {
-  return async (ctx, next) => {
-    // Pre-execution validation
-    if (!ctx.payload) {
-      throw new Error('Payload is required');
-    }
-    
-    await next();
-    
-    // Post-execution logic
-    console.log('Transaction completed successfully');
-  };
-}
-
-saga.use(createValidationMiddleware());
-```
-
-### Error Handling
-
-```typescript
-const transaction = saga
-  .createTransaction('risky-operation')
-  .addStep(
-    'step1',
-    async (state, payload) => {
-      // This might fail
-      throw new Error('Something went wrong');
-    },
-    async (state, payload) => {
-      // This compensation will run during rollback
-      console.log('Rolling back step1');
-    },
-    { retries: 3, timeout: 10000 }
-  );
-
-try {
-  await transaction.run(payload);
-} catch (error) {
-  // All executed steps have been compensated
-  // State has been rolled back to snapshot
-  console.error('Transaction failed and rolled back');
-}
-```
-
-### Reactive Selectors
-
-```typescript
-const activeUsers = saga.createSelector(state =>
-  state.users.filter(u => u.active)
-);
-
-activeUsers.subscribe(users => {
-  console.log('Active users:', users);
-});
-```
-
-### Transaction Composition
-
-```typescript
-const t1 = saga.createTransaction('stepA') /* ... */;
-const t2 = saga.createTransaction('stepB') /* ... */;
-
-await saga.composeSequential('workflow', [t1, t2]).execute(payload);
-```
-
-### Event Replay
-
-```typescript
-const session = saga.startRecording();
-// run transactions...
+```ts
+saga.startRecording();
+// ...run transactions & emit events
 saga.stopRecording();
-
-const events = saga.getRecordedEvents();
 await saga.startReplay();
 ```
 
-### Redux-style Action Creators
+## Demos
 
-```typescript
-import { createStepAction } from 'staga';
+Build and open the comprehensive demo:
 
-const addUser = createStepAction<AppState, { name: string }>(
-  'user/add',
-  (state, payload) => { state.users.push(payload.name); }
-);
-
-saga.createTransaction('addUser').addStep(addUser).run({ name: 'Jane' });
+```bash
+npm run build
+# then open demo/index.html in a browser
 ```
 
-### Type-safe Event Helpers
-
-```typescript
-import { createEvent, matchEvent } from 'staga';
-
-const evt = createEvent.transactionStart('checkout', { total: 0 });
-
-matchEvent(evt)
-  .onTransactionStart(e => console.log(e.transactionName))
-  .execute();
-```
-
-## API Reference
-
-### SagaManager
-
-- `static create<TState>(initialState: TState): SagaManager<TState>`
-
-- `createTransaction<TPayload = unknown>(name: string): TransactionBuilder<TState, TPayload>`
-- `createVoidTransaction(name: string): Transaction<TState, void>`
-- `use(middleware: AnyMiddleware<TState>): void`
-- `onEvent(eventType: string, listener: SagaEventListener): () => void` _(replaces deprecated `on` method)_
-- `onAnyEvent(listener: AnySagaEventListener): () => void`
-- `on(event: string, listener: (...args: unknown[]) => void): () => void` _(legacy)_
-- `getState(): TState`
-- `undo(): void`
-- `redo(): void`
-
-The `createTransaction` method returns a `TransactionBuilder`, allowing you to configure steps before running the transaction.
-
-### Transaction
-
-- `addStep(name: string, execute: StepFunction, compensate?: StepFunction, options?: StepOptions): this`
-- `run(payload: TPayload): Promise<void>`
-
-### Built-in Middleware
-
-- `createPersistenceMiddleware<TState>(storageKey: string): Middleware<TState, any>`
-- `createLoggingMiddleware<TState>(): Middleware<TState, any>`
-- `createTimingMiddleware<TState>(onComplete?: (name: string, duration: number) => void): Middleware<TState, any>`
-
-## Events
-
-- `transaction:start` - Transaction execution started
-- `transaction:success` - Transaction completed successfully
-- `transaction:fail` - Transaction failed
-- `transaction:rollback` - Transaction rolled back
-- `step:start` - Step execution started
-- `step:success` - Step completed successfully
-- `step:retry` - Step retry attempt
-- `step:rollback` - Step compensation executed
+The demo includes:
+- State selectors via Signals
+- Typed events and Streams
+- An AI agent powered by transactions (with retries/timeouts and compensation)
+- A multi-step tool orchestration pipeline with rollback
 
 ## License
 

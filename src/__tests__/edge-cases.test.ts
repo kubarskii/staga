@@ -104,7 +104,7 @@ describe('Edge Cases and Error Handling', () => {
 
       expect(nullableSaga.getState().value).toBe(42);
       expect(nullableSaga.getState().optional).toBe('defined');
-      expect(nullableSaga.getState().items).toEqual([null, undefined]);
+      expect(nullableSaga.getState().items).toEqual([null, undefined]); // Undefined values are preserved
 
       nullableSaga.dispose();
     });
@@ -298,8 +298,8 @@ describe('Edge Cases and Error Handling', () => {
         throw new Error('Listener error');
       });
 
-      saga.on('transaction:start', workingListener);
-      saga.on('transaction:start', throwingListener);
+      saga.onSagaEvent('transaction:start', (e) => workingListener(e.payload));
+      saga.onSagaEvent('transaction:start', () => { throwingListener(); });
 
       const transaction = saga
         .createTransaction('listener-error')
@@ -310,7 +310,20 @@ describe('Edge Cases and Error Handling', () => {
 
       expect(workingListener).toHaveBeenCalled();
       expect(throwingListener).toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith('Legacy event listener error for transaction:start:', expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[unified-event-manager:transaction:start] Listener error',
+        expect.objectContaining({
+          severity: 'medium',
+          originalError: expect.any(Error),
+          context: expect.objectContaining({
+            component: 'unified-event-manager',
+            operation: 'transaction:start',
+            metadata: expect.objectContaining({
+              listenerType: 'reactive-unified'
+            })
+          })
+        })
+      );
 
       consoleSpy.mockRestore();
     });
@@ -325,9 +338,9 @@ describe('Edge Cases and Error Handling', () => {
       complexPayload.circular = complexPayload;
 
       const listener = vi.fn();
-      saga.on('test:event', listener);
+      saga.onSagaEvent('test:event', (e) => listener(e.payload));
 
-      saga.emit('test:event', complexPayload);
+      saga.emitSagaEvent({ type: 'test:event', payload: complexPayload, timestamp: Date.now() });
 
       expect(listener).toHaveBeenCalledWith(complexPayload);
     });

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { StateManager } from '../StateManager';
 import { SagaManager } from '../SagaManager';
 import { Transaction } from '../Transaction';
-import { deepEqual } from '../ReactiveSelectors';
+import { deepEqual } from '../utils';
 
 interface TestState {
     counter: number;
@@ -126,10 +126,10 @@ describe('Transaction', () => {
 
         it('should emit correct events during execution', async () => {
             const events: string[] = [];
-            sagaManager.on('transaction:start', () => events.push('transaction:start'));
-            sagaManager.on('transaction:success', () => events.push('transaction:success'));
-            sagaManager.on('step:start', () => events.push('step:start'));
-            sagaManager.on('step:success', () => events.push('step:success'));
+            sagaManager.onSagaEvent('transaction:start', () => events.push('transaction:start'));
+            sagaManager.onSagaEvent('transaction:success', () => events.push('transaction:success'));
+            sagaManager.onSagaEvent('step:start', () => events.push('step:start'));
+            sagaManager.onSagaEvent('step:success', () => events.push('step:success'));
 
             transaction.addStep('test-step', vi.fn());
 
@@ -145,10 +145,10 @@ describe('Transaction', () => {
 
         it('should emit failure and rollback events on error', async () => {
             const events: string[] = [];
-            sagaManager.onEvent('transaction:start', () => events.push('transaction:start'));
-            sagaManager.onEvent('transaction:fail', () => events.push('transaction:fail'));
-            sagaManager.onEvent('transaction:rollback', () => events.push('transaction:rollback'));
-            sagaManager.onEvent('step:rollback', () => events.push('step:rollback'));
+            sagaManager.onSagaEvent('transaction:start', () => events.push('transaction:start'));
+            sagaManager.onSagaEvent('transaction:fail', () => events.push('transaction:fail'));
+            sagaManager.onSagaEvent('transaction:rollback', () => events.push('transaction:rollback'));
+            sagaManager.onSagaEvent('step:rollback', () => events.push('step:rollback'));
 
             transaction
                 .addStep('step1', vi.fn(), vi.fn())
@@ -227,8 +227,8 @@ describe('Transaction', () => {
             });
 
             const retryEvents: string[] = [];
-            sagaManager.on('step:retry', (stepName, attempt) => {
-                retryEvents.push(`${stepName}:${attempt}`);
+            sagaManager.onSagaEvent('step:retry', (event) => {
+                retryEvents.push(`${event.stepName}:${event.attempt}`);
             });
 
             transaction.addStep('failing-step', failingStep, undefined, { retries: 2 });
@@ -371,6 +371,128 @@ describe('Transaction', () => {
 
             // State should be rolled back to snapshot, not to mutations
             expect(sagaManager.getState().counter).toBe(0);
+        });
+    });
+
+    describe('async step rollback', () => {
+        it('should execute async steps and rollback on failure', async () => {
+            const sagaManager = SagaManager.create({
+                counter: 0,
+                items: [] as string[]
+            });
+
+            const compensationCalls: string[] = [];
+            const stepCalls: string[] = [];
+
+            const asyncTransaction = sagaManager
+                .createTransaction<{ value: number }>('async-failure-test')
+                .addStep('step1', async (state, payload) => {
+                    stepCalls.push('step1-execute');
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    state.counter += payload.value;
+                    state.items.push('item1');
+                }, async (state, payload) => {
+                    compensationCalls.push('step1-compensate');
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                    // Compensation logic (will be overridden by snapshot rollback)
+                })
+                .addStep('step2', async (state, payload) => {
+                    stepCalls.push('step2-execute');
+                    await new Promise(resolve => setTimeout(resolve, 40));
+                    state.counter += payload.value * 2;
+                    state.items.push('item2');
+                }, async (state, payload) => {
+                    compensationCalls.push('step2-compensate');
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                    // Compensation logic (will be overridden by snapshot rollback)
+                })
+                .addStep('failing-step', async () => {
+                    stepCalls.push('failing-step-execute');
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                    throw new Error('Simulated async failure');
+                });
+
+            const initialState = { counter: 0, items: [] as string[] }; // Capture true initial state
+
+            // Execute transaction - should fail at the last step
+            await expect(asyncTransaction.run({ value: 10 })).rejects.toThrow(
+                'Transaction "async-failure-test" failed and rolled back: Simulated async failure'
+            );
+
+            const finalState = sagaManager.getState();
+
+            // Verify execution order
+            expect(stepCalls).toEqual([
+                'step1-execute',
+                'step2-execute',
+                'failing-step-execute'
+            ]);
+
+            // Verify compensation called in reverse order (excluding failed step)
+            expect(compensationCalls).toEqual([
+                'step2-compensate',   // Last successful step compensated first
+                'step1-compensate'    // First step compensated last
+            ]);
+
+            // Verify state was completely rolled back to initial state
+            expect(finalState).toEqual(initialState);
+            expect(finalState.counter).toBe(0);
+            expect(finalState.items).toEqual([]);
+        });
+
+        it('should handle async steps with varying delays', async () => {
+            const sagaManager = SagaManager.create({
+                value: 0,
+                log: [] as string[]
+            });
+
+            const transaction = sagaManager
+                .createTransaction<{}>('async-timing-test')
+                .addStep('fast-step', async (state) => {
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                    state.value += 1;
+                    state.log.push('fast-executed');
+                })
+                .addStep('slow-step', async (state) => {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    state.value += 10;
+                    state.log.push('slow-executed');
+                })
+                .addStep('instant-fail', () => {
+                    throw new Error('Instant failure');
+                });
+
+            const initialState = { value: 0, log: [] as string[] };
+
+            await expect(transaction.run({})).rejects.toThrow(
+                'Transaction "async-timing-test" failed and rolled back: Instant failure'
+            );
+
+            // State should be restored to initial state
+            expect(sagaManager.getState()).toEqual(initialState);
+        });
+
+        it('should properly handle compensation function errors', async () => {
+            const sagaManager = SagaManager.create({ counter: 0 });
+
+            const transaction = sagaManager
+                .createTransaction<{}>('compensation-error-test')
+                .addStep('good-step', (state) => {
+                    state.counter += 1;
+                }, () => {
+                    // This compensation will fail
+                    throw new Error('Compensation error');
+                })
+                .addStep('failing-step', () => {
+                    throw new Error('Step failure');
+                });
+
+            // When compensation fails, that error bubbles up
+            await expect(transaction.run({})).rejects.toThrow('Compensation error');
+
+            // When compensation fails, state may not be fully rolled back since rollback was interrupted
+            // This is expected behavior - compensation failures leave system in uncertain state
+            expect(sagaManager.getState().counter).toBe(1); // Step executed but compensation failed
         });
     });
 });

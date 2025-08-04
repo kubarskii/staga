@@ -1,65 +1,35 @@
 /**
  * Staga - A TypeScript library for managing state transactions with saga pattern
+ * Simplified and streamlined for better maintainability
  */
 
-// Core classes
+// ===== CORE CLASSES =====
 export { StateManager, type StateManagerOptions } from './StateManager';
 export { Transaction, TransactionBuilder } from './Transaction';
-export { SagaManager } from './SagaManager';
-export { TransactionExecutor } from './TransactionExecutor';
-export { TransactionRollback } from './TransactionRollback';
+export { SagaManager, type SagaManagerOptions } from './SagaManager';
 export { MiddlewareOrchestrator } from './MiddlewareOrchestrator';
 
-// Reactive selectors
-export {
-    Observable,
-    ReactiveSelector,
-    ComputedValue,
-    ReactiveSelectorFactory,
-    ReactiveUtils,
-    deepEqual,
-    type ReactiveValue,
-    type StateChangeListener,
-    type SelectorSubscription
-} from './ReactiveSelectors';
+// ===== REACTIVE SYSTEM =====
+// Subject/BehaviorSubject removed from public API; use statekit.Stream
 
-// TypeScript enhancements
+// ===== STATE MANAGEMENT =====
 export {
-    createTypedSelector,
-    isValidState,
-    isValidPayload,
-    assertValidState,
-    assertValidPayload,
-    createTransactionId,
-    createStepId,
-    createStateVersion,
-    createEventId,
-    type ValidState,
-    type ValidPayload,
-    type TypedSelector,
-    type TypedStepFunction,
-    type TypedCompensateFunction,
-    type TypedStep,
-    type TransactionId,
-    type StepId,
-    type StateVersion,
-    type EventId,
-    type DeepReadonly,
-    type Brand
-} from './TypeScriptEnhancements';
+    ReactiveStateProxy,
+    type ReactiveProxyOptions
+} from './ReactiveStateProxy';
 
-// Transaction composition
+// ===== EVENT SYSTEM =====
 export {
-    TransactionComposer,
-    CompositionBuilder,
-    CompositionPatterns,
-    type CompositionStrategy,
-    type CompositionOptions,
-    type CompositionResult,
-    type TransactionDefinition
-} from './TransactionComposition';
+    SagaEventManager,
+    type SagaEventManagerOptions
+} from './managers/SagaEventManager';
 
-// Event replay system
+export {
+    UnifiedEventManager,
+    type UnifiedEventManagerOptions
+} from './managers/UnifiedEventManager';
+
+// ===== EVENT REPLAY =====
 export {
     EventRecorder,
     EventReplayer,
@@ -71,84 +41,103 @@ export {
     type EventFilter
 } from './EventReplay';
 
-// Types
-export type {
-    StepFunction,
-    StepOptions,
-    SagaStep,
-    MiddlewareContext,
-    Middleware,
-    EventName,
-    EventArgs,
-    Listener,
-    SagaEvent,
-    SagaEventListener,
-    AnySagaEventListener,
-    AnySagaEvent,
-    TypedEventListener,
-    TransactionStartEvent,
-    TransactionSuccessEvent,
-    TransactionFailEvent,
-    TransactionCompleteEvent,
-    TransactionRollbackEvent,
-    StepStartEvent,
-    StepSuccessEvent,
-    StepRetryEvent,
-    StepRollbackEvent,
-} from './types';
+// ===== DEPENDENCY INJECTION =====
+export {
+    DIContainer,
+    DependencyResolutionError,
+    CircularDependencyError,
+    Injectable,
+    Inject,
+    autoRegister,
+    // Enhanced decorators
+    InjectableEnhanced,
+    InjectEnhanced,
+    Singleton,
+    Transient,
+    Scoped,
+    InjectProperty,
+    autoRegisterEnhanced,
+    // Types
+    type ServiceRegistration,
+    type LifecycleScope,
+    type ContainerOptions,
+    type InjectableOptions,
+    type InjectOptions
+} from './di';
 
-// Middleware utilities
+// ===== PLUGINS =====
+export {
+    PluginManager,
+    type StagaPlugin,
+    type PluginMetadata,
+    type PluginHooks
+} from './plugins';
+
+// ===== MIDDLEWARE =====
 export {
     createPersistenceMiddleware,
     loadPersistedState,
     createLoggingMiddleware,
-    createTimingMiddleware,
+    createTimingMiddleware
 } from './middleware';
 
-// Helper utilities for type-safe development
+// ===== ERROR MANAGEMENT =====
 export {
-    createStep,
-    createStateUpdater,
-    createStateValidator,
-    createStateTransformer,
-    createPayloadValidator,
-    isValidState as isValidStateHelper,
-} from './helpers';
+    ErrorManager,
+    ConsoleErrorHandler,
+    ErrorSeverity,
+    type ErrorContext,
+    type StructuredError,
+    type ErrorHandler
+} from './ErrorManager';
 
-// Redux-style action creators and selectors
+// ===== UTILITIES =====
 export {
-    createStepAction,
-    createSimpleStepAction,
-    createStepSlice,
-    createAsyncStepAction,
-    createStepBatch,
-    StepActionUtils,
-    type StepActionCreator,
-    type AsyncStepActionCreator,
-    type StepSlice,
-    type StepReducer,
-} from './actionCreators';
+    deepEqual,
+    shallowEqual,
+    getNestedProperty,
+    createMemoizedSelector,
+    isEventOfType,
+    safeStringify,
+    debounce,
+    SubscriptionManager,
+    isDebugEnabled
+} from './utils';
 
-export {
-    createSelector,
-    createParameterizedSelector,
-    SelectorFactory,
-    StateSelectors,
-    type Selector,
-    type ParameterizedSelector,
-    type InferSelectorState,
-    type InferSelectorResult,
-} from './selectors';
+// ===== TYPES =====
+export type {
+    SagaStep,
+    StepFunction,
+    StepOptions,
+    MiddlewareContext,
+    Middleware,
+    AnyMiddleware,
+    // Event types
+    SagaEvent,
+    AnySagaEvent,
+    TransactionStartEvent,
+    TransactionSuccessEvent,
+    TransactionFailEvent,
+    TransactionCompleteEvent,
+    StepStartEvent,
+    StepSuccessEvent,
+    StepRetryEvent,
+    StepRollbackEvent,
+    TransactionRollbackEvent,
+    // Event listeners
+    EventName,
+    EventArgs,
+    Listener,
+    SagaEventListener,
+    AnySagaEventListener,
+    TypedEventListener,
+    AnyEventListener
+} from './types';
 
-// Type-safe event helpers
-export {
-    createEvent,
-    isEventType,
-    matchEvent,
-    createEventHandler,
-    type ExtractEventPayload,
-    type EventMatcher,
-} from './eventHelpers';
+// ===== VERSION =====
+export const VERSION = '1.0.0';
 
-// Re-export for convenience
-export { SagaManager as Staga } from './SagaManager';
+// ===== STATEKIT (NEW API) =====
+export * from './statekit';
+export type { Transaction as SKTransaction } from './statekit';
+export { createTransaction as createSKTransaction } from './statekit';

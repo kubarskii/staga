@@ -25,7 +25,9 @@
         "noImplicitReturns": true,
         "noFallthroughCasesInSwitch": true,
         "noUncheckedIndexedAccess": true,
-        "noImplicitOverride": true
+        "noImplicitOverride": true,
+        "downlevelIteration": true,
+        "experimentalDecorators": true
     },
     "include": [
         "src/**/*"
