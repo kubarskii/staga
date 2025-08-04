@@ -366,7 +366,7 @@
         let recordedEvents = [];
 
         // Reactive selectors
-        let userBalance$, orderCount$, canAffordLaptop$, orderStats$, fullState$;
+        let userBalance$, orderCount$, canAffordLaptop$, orderStats$, state$;
 
         // Product catalog
         const products = {
@@ -408,11 +408,11 @@
             // Set up reactive selectors
             setupReactiveSelectors();
 
+            // Set up rendering to automatically update UI on state changes
+            setupRendering();
+
             // Set up event listeners
             setupEventListeners();
-
-            // Initial UI update
-            updateUI();
 
             log('✅ Staga demo initialized successfully!');
         }
@@ -461,15 +461,6 @@
             orderStats$.subscribe((stats) => {
                 logReactive(`📊 Order stats: ${JSON.stringify(stats)}`);
             });
-
-            // Subscribe to full state changes to update UI
-            fullState$ = saga.select(state => state);
-            const updateStateViews = () => {
-                updateFullState();
-                updateMetrics();
-            };
-            fullState$.subscribe(updateStateViews);
-            updateStateViews();
         }
 
         function setupEventListeners() {
@@ -509,19 +500,16 @@
                 }
             });
 
-            updateUI();
             log(`👤 User updated: ${name}, Balance: $${balance}`);
         }
 
         function undo() {
             saga.stateManager.undo();
-            updateUI();
             log('↶ Undo performed');
         }
 
         function redo() {
             saga.stateManager.redo();
-            updateUI();
             log('↷ Redo performed');
         }
 
@@ -547,7 +535,6 @@
                     orders: state.orders.slice(0, -1)
                 };
                 saga.stateManager.setState(newState);
-                updateUI();
             }
         }
 
@@ -660,7 +647,6 @@
                     });
 
                 await orderTransaction.run({ productId, quantity });
-                updateUI();
 
             } catch (error) {
                 logTransaction(`❌ Order failed: ${error.message}`);
@@ -673,7 +659,6 @@
             } catch (error) {
                 // Execute fallback
                 await fallbackTransaction.run({ productId, quantity });
-                updateUI();
                 logTransaction(`🔄 Fallback executed due to: ${error.message}`);
             }
         }
@@ -777,7 +762,6 @@
                 });
 
                 logReplay('✅ Replay completed successfully');
-                updateUI();
             } catch (error) {
                 logReplay(`❌ Replay failed: ${error.message}`);
                 console.error('Replay error details:', error);
@@ -833,28 +817,27 @@
             setTimeout(() => {
                 const currentEvents = saga.getRecordedEvents();
                 logReplay(`📊 Events after test: ${currentEvents.length}`);
-                updateUI();
             }, 300);
         }
 
-        // UI Update Functions
-        function updateUI() {
-            const state = saga.getState();
+        // Rendering Functions
+        function setupRendering() {
+            // Subscribe to entire state and render whenever it changes
+            state$ = saga.select(state => state);
+            state$.subscribe(render);
+            render(saga.getState());
+        }
 
+        function render(state) {
             // Update form fields
             document.getElementById('user-name').value = state.user.name;
             document.getElementById('user-balance').value = state.user.balance;
-        }
 
-        function updateFullState() {
-            const state = saga.getState();
+            // Update full state display
             document.getElementById('full-state').textContent = JSON.stringify(state, null, 2);
-        }
 
-        function updateMetrics() {
+            // Update metrics
             const metrics = saga.getPerformanceMetrics();
-            const state = saga.getState();
-
             document.getElementById('metrics-display').innerHTML = `
                 <div class="metric">
                     <div class="metric-value">${metrics.totalChanges}</div>
