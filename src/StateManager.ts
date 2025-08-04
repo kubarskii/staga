@@ -61,7 +61,7 @@ export class StateManager<TState extends object> {
             maxSnapshots: options.maxSnapshots ?? 20,
             autoCleanup: options.autoCleanup ?? true,
             snapshotInterval: options.snapshotInterval ?? 10,
-            clone: options.clone ?? structuredClone
+            clone: options.clone ?? ((value) => structuredClone(value))
         };
 
         this.state = this.options.clone(initialState);
