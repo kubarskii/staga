@@ -146,9 +146,7 @@ export class SagaManager<TState extends object> {
       this.typedListeners.set(eventType, []);
     }
     const wrappedCallback: AnySagaEventListener = (event: AnySagaEvent) => {
-      if (
-        this.isEventOfType<Extract<SagaEvent<TPayload>, { type: T }>>(event, eventType)
-      ) {
+      if (this.isEventOfType<T, TPayload>(event, eventType)) {
         callback(event);
       }
     };
@@ -205,8 +203,9 @@ export class SagaManager<TState extends object> {
       this.typedListeners.set(eventType, []);
     }
     const wrappedCallback: AnySagaEventListener = (event: AnySagaEvent) => {
-      if (this.isEventOfType<TEvent>(event, eventType)) {
-        callback(event);
+      if (this.isEventOfType<TEvent['type']>(event, eventType)) {
+        // After narrowing, cast through unknown to satisfy TypeScript
+        callback(event as unknown as TEvent);
       }
     };
     const listeners = this.typedListeners.get(eventType)!;
@@ -226,10 +225,13 @@ export class SagaManager<TState extends object> {
     };
   }
 
-  private isEventOfType<E extends AnySagaEvent>(
+  private isEventOfType<
+    T extends AnySagaEvent['type'],
+    TPayload = unknown
+  >(
     event: AnySagaEvent,
-    type: E['type']
-  ): event is E {
+    type: T
+  ): event is Extract<SagaEvent<TPayload>, { type: T }> {
     return event.type === type;
   }
 
