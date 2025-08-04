@@ -72,6 +72,7 @@ This demo showcases all the key features of the Staga library in a browser envir
 - Values update automatically without manual refresh
 - Complex computations recalculate only when dependencies change
 - Type-safe transformations throughout the chain
+- Full UI re-renders automatically when state changes
 
 ### Transaction Integrity
 - Failed transactions automatically rollback
