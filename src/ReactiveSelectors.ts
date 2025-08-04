@@ -96,6 +96,11 @@ export class ReactiveSelector<TState extends object, TResult> implements Reactiv
 
     subscribe(listener: StateChangeListener<TResult>): SelectorSubscription {
         this.listeners.add(listener);
+        // If the selector was invalidated before any listeners were attached,
+        // ensure we recompute now so subscribers receive the latest value
+        if (!this._isValid) {
+            this.recompute();
+        }
         return () => this.listeners.delete(listener);
     }
 
@@ -202,6 +207,11 @@ export class ComputedValue<T> implements ReactiveValue<T> {
 
     subscribe(listener: StateChangeListener<T>): SelectorSubscription {
         this.listeners.add(listener);
+        // Ensure computed values reflect the latest dependencies when the first
+        // subscriber is added after a change
+        if (!this._isValid) {
+            this.recompute();
+        }
         return () => this.listeners.delete(listener);
     }
 

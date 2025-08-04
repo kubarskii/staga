@@ -63,5 +63,27 @@ describe('Computed values', () => {
         expect(sum$.value).toBe(9);
         expect(updates[updates.length - 1]).toBe(9);
     });
+
+    it('should recompute when subscribed after state changes', async () => {
+        const a$ = saga.selectProperty('a');
+        const b$ = saga.selectProperty('b');
+        const sum$ = saga.computed(a$, b$, (a, b) => a + b);
+
+        const tx = saga.createTransaction<{ a: number; b: number }>('update-ab')
+            .addStep('set', (state, payload) => {
+                state.a = payload.a;
+                state.b = payload.b;
+            });
+
+        await tx.run({ a: 4, b: 5 });
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        const updates: number[] = [];
+        sum$.subscribe(v => updates.push(v));
+
+        // Without calling sum$.value, subscriber should receive the latest value
+        expect(updates).toEqual([9]);
+        expect(sum$.value).toBe(9);
+    });
 });
 
