@@ -216,11 +216,15 @@ export class StateManager<TState extends object> {
             if (next) {
                 // Push current state to undo stack so we can undo the redo
                 this.undoStack.push(this.options.clone(this.state));
-                this.state = next;
                 this.metrics.redoOperations++;
 
-                // Subscribers will be notified through store subscription path
-                this.metrics.immediateNotifications++;
+                if (this.store) {
+                    this.store.setState(() => next);
+                } else {
+                    this.state = next;
+                    this.stateStream.next(this.state);
+                    this.metrics.immediateNotifications++;
+                }
             }
         }
     }
@@ -386,7 +390,7 @@ export class StateManager<TState extends object> {
         selector: (state: TState) => TResult,
         equalityFn?: (a: TResult, b: TResult) => boolean
     ): { get(): TResult; subscribe(observer: (value: TResult) => void): () => void; readonly value: TResult } {
-        const eq = equalityFn ?? ((a, b) => JSON.stringify(a) === JSON.stringify(b));
+        const eq = equalityFn ?? ((Object.is as unknown) as (a: TResult, b: TResult) => boolean);
         const sig = selectSignal(this.store as Store<TState>, selector, eq) as Signal<TResult>;
         return this.toValueSignal(sig);
     }
@@ -463,6 +467,13 @@ export class StateManager<TState extends object> {
      */
     private defaultEquals<T>(a: T, b: T): boolean {
         return deepEqual(a, b);
+    }
+
+    /**
+     * Expose clone utility for internal consumers like Transaction
+     */
+    public clone<T>(value: T): T {
+        return this.options.clone(value);
     }
 
     /**

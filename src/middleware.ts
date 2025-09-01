@@ -9,9 +9,13 @@ export function createPersistenceMiddleware<TState extends object>(
 ): Middleware<TState, unknown> {
     return async (ctx, next) => {
         await next();
+        if (typeof globalThis.localStorage === 'undefined') {
+            console.warn('[Persistence] localStorage not available; skipping state save.');
+            return;
+        }
         try {
             const state: TState = ctx.getState();
-            localStorage.setItem(storageKey, JSON.stringify(state));
+            globalThis.localStorage.setItem(storageKey, JSON.stringify(state));
         } catch (err) {
             console.error('[Persistence] Failed to save state:', err);
         }
@@ -26,7 +30,11 @@ export function loadPersistedState<TState extends object>(
     defaultState: TState
 ): TState {
     try {
-        const saved = localStorage.getItem(storageKey);
+        if (typeof globalThis.localStorage === 'undefined') {
+            console.warn('[Persistence] localStorage not available; using default state.');
+            return defaultState;
+        }
+        const saved = globalThis.localStorage.getItem(storageKey);
         return saved ? JSON.parse(saved) : defaultState;
     } catch {
         return defaultState;

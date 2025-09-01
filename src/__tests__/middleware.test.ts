@@ -22,6 +22,8 @@ const localStorageMock = {
 
 Object.defineProperty(global, 'localStorage', {
   value: localStorageMock,
+  configurable: true,
+  writable: true,
 });
 
 describe('Middleware', () => {
@@ -37,8 +39,8 @@ describe('Middleware', () => {
     saga.dispose();
   });
 
-  describe('createPersistenceMiddleware', () => {
-    it('should save state to localStorage after successful transaction', async () => {
+    describe('createPersistenceMiddleware', () => {
+        it('should save state to localStorage after successful transaction', async () => {
       const middleware = createPersistenceMiddleware<TestState>('test-key');
       saga.use(middleware);
 
@@ -71,11 +73,11 @@ describe('Middleware', () => {
       expect(localStorageMock.setItem).not.toHaveBeenCalled();
     });
 
-    it('should handle localStorage errors gracefully', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
-      localStorageMock.setItem.mockImplementation(() => {
-        throw new Error('Storage error');
-      });
+        it('should handle localStorage errors gracefully', async () => {
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+            localStorageMock.setItem.mockImplementation(() => {
+                throw new Error('Storage error');
+            });
 
       const middleware = createPersistenceMiddleware<TestState>('test-key');
       saga.use(middleware);
@@ -91,11 +93,34 @@ describe('Middleware', () => {
 
       expect(consoleSpy).toHaveBeenCalledWith('[Persistence] Failed to save state:', expect.any(Error));
 
-      consoleSpy.mockRestore();
-    });
-  });
+            consoleSpy.mockRestore();
+        });
 
-  describe('loadPersistedState', () => {
+        it('should skip persistence when localStorage is unavailable', async () => {
+            const original = (global as any).localStorage;
+            // @ts-ignore
+            delete (global as any).localStorage;
+            const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+
+            const middleware = createPersistenceMiddleware<TestState>('test-key');
+            saga.use(middleware);
+
+            const transaction = saga
+                .createTransaction('test')
+                .addStep('increment', (state) => {
+                    state.counter = 5;
+                });
+
+            await transaction.run({});
+
+            expect(consoleSpy).toHaveBeenCalledWith('[Persistence] localStorage not available; skipping state save.');
+
+            (global as any).localStorage = original;
+            consoleSpy.mockRestore();
+        });
+    });
+
+    describe('loadPersistedState', () => {
     it('should load state from localStorage', () => {
       const savedState = { counter: 10, name: 'saved' };
       localStorageMock.getItem.mockReturnValue(JSON.stringify(savedState));
@@ -122,16 +147,30 @@ describe('Middleware', () => {
       expect(result).toEqual(initialState);
     });
 
-    it('should handle localStorage errors gracefully', () => {
-      localStorageMock.getItem.mockImplementation(() => {
-        throw new Error('Storage error');
-      });
+        it('should handle localStorage errors gracefully', () => {
+            localStorageMock.getItem.mockImplementation(() => {
+                throw new Error('Storage error');
+            });
 
       const result = loadPersistedState('test-key', initialState);
 
-      expect(result).toEqual(initialState);
+            expect(result).toEqual(initialState);
+        });
+
+        it('should return default state when localStorage is unavailable', () => {
+            const original = (global as any).localStorage;
+            // @ts-ignore
+            delete (global as any).localStorage;
+            const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+
+            const result = loadPersistedState('test-key', initialState);
+
+            expect(result).toEqual(initialState);
+
+            (global as any).localStorage = original;
+            consoleSpy.mockRestore();
+        });
     });
-  });
 
   describe('createLoggingMiddleware', () => {
     it('should log transaction start and completion', async () => {

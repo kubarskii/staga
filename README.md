@@ -133,7 +133,7 @@ saga.use(createPersistenceMiddleware('app-state'));
 saga.startRecording();
 // ...run transactions & emit events
 saga.stopRecording();
-await saga.startReplay();
+await saga.startReplay({ delay: 50 }); // optional delay between events
 ```
 
 ## Demos

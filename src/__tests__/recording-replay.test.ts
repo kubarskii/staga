@@ -195,4 +195,16 @@ describe('Event Recording and Replay', () => {
         expect(event.type).toBe('state:change');
         expect(event.stateSnapshot).toEqual({ counter: 1, items: [], user: undefined });
     });
+
+    it('should allow custom replay delay', async () => {
+        saga.startRecording();
+        const state = saga.getState();
+        saga.stateManager.setState({ ...state, counter: 1 });
+        saga.stopRecording();
+
+        const spy = vi.spyOn(global, 'setTimeout');
+        await saga.startReplay({ delay: 10 });
+        expect(spy).toHaveBeenCalledWith(expect.any(Function), 10);
+        spy.mockRestore();
+    });
 });
