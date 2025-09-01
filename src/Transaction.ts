@@ -2,7 +2,6 @@ import type { SagaStep, StepFunction, StepOptions, MiddlewareContext, Middleware
 import type { StateManager } from './StateManager';
 import { MiddlewareOrchestrator } from './MiddlewareOrchestrator';
 import { ReactiveStateProxy, type ReactiveProxyOptions } from './ReactiveStateProxy';
-import { deepEqual } from './utils';
 import { createTransaction as createSKTransaction, type TxEvent, type TxStep } from './statekit';
 
 // Event emitter interface to avoid circular dependency
@@ -180,7 +179,7 @@ export class Transaction<TState extends object, TPayload = unknown> {
     const startTime = Date.now();
 
     // Capture the initial state before the transaction
-    const initialState = JSON.parse(JSON.stringify(this.stateManager.getState()));
+    const initialState = this.stateManager.clone(this.stateManager.getState());
     this.stateManager.createSnapshot();
 
     // Middleware context remains the same
@@ -220,7 +219,8 @@ export class Transaction<TState extends object, TPayload = unknown> {
 
         // After successful execution, if state has changed, add it to undo stack
         const finalState = this.stateManager.getState();
-        if (!deepEqual(initialState, finalState)) {
+        const eq = this.options.equalityFn ?? ((this.stateManager as any)['options'].equalityFn as (a: TState, b: TState) => boolean);
+        if (!eq(initialState, finalState)) {
           this.stateManager.addToUndoStack(initialState);
         }
 

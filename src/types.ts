@@ -14,6 +14,10 @@ export interface StepOptions {
 
 export interface TransactionOptions {
     disableAutoRollback?: boolean;
+    /**
+     * Custom equality function for transaction state change detection
+     */
+    equalityFn?: <T>(a: T, b: T) => boolean;
 }
 
 export interface SagaStep<TState extends object, TPayload> {
@@ -128,7 +132,7 @@ export type AnySagaEvent = SagaEvent<any>;
 export interface EventMap<TPayload = unknown> {
     'transaction:start': [transactionName: string, payload: TPayload];
     'transaction:success': [transactionName: string, payload: TPayload];
-    'transaction:fail': [transactionName: string, error: Error];
+    'transaction:fail': [transactionName: string, payload: TPayload, error: Error];
     'transaction:rollback': [transactionName: string];
     'step:start': [stepName: string, payload: TPayload];
     'step:success': [stepName: string, payload: TPayload];

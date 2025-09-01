@@ -290,6 +290,7 @@ export class EventReplayer<TPayload = unknown> {
     private replayListeners: Set<(state: ReplayState) => void> = new Set();
     private eventHandlers: Map<string, (event: RecordedEvent<TPayload>) => void | Promise<void>> = new Map();
     private timeoutId: NodeJS.Timeout | null = null;
+    private replayOptions: ReplayOptions = {};
 
     /**
      * Load events for replay
@@ -321,6 +322,7 @@ export class EventReplayer<TPayload = unknown> {
             isPaused: false
         };
 
+        this.replayOptions = options;
         this.notifyStateListeners();
 
         try {
@@ -531,11 +533,41 @@ export class EventReplayer<TPayload = unknown> {
             return;
         }
 
-        // For non-real-time mode, just execute immediately
-        this.timeoutId = setTimeout(() => {
-            // This would continue the replay loop
+        const options = this.replayOptions;
+        if (this.replayState.currentEvent >= this.replayState.totalEvents) {
+            this.replayState.isReplaying = false;
             this.notifyStateListeners();
-        }, 0);
+            return;
+        }
+
+        const event = this.events[this.replayState.currentEvent];
+        if (!event) {
+            this.replayState.currentEvent++;
+            this.scheduleNextEvent();
+            return;
+        }
+
+        let delay = 0;
+        if (options.realTimeMode && this.replayState.currentEvent > 0) {
+            const prev = this.events[this.replayState.currentEvent - 1];
+            delay = (event.timestamp - prev.timestamp) / this.replayState.speed;
+        }
+
+        this.timeoutId = setTimeout(async () => {
+            try {
+                await this.executeEvent(event);
+            } catch (error) {
+                console.error('Error executing event during replay:', error);
+                if (options.pauseOnErrors) {
+                    this.pause();
+                    return;
+                }
+            }
+
+            this.replayState.currentEvent++;
+            this.notifyStateListeners();
+            this.scheduleNextEvent();
+        }, delay);
     }
 
     private async waitForResume(): Promise<void> {

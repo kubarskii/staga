@@ -51,9 +51,6 @@ export class Subject<T> {
 
     /**
      * Complete the subject (no more emissions)
-     */
-    /**
-     * Complete the subject (no more emissions)
      * @deprecated Streams in statekit do not require completion. Avoid relying on this.
      */
     complete(): void {
@@ -63,18 +60,12 @@ export class Subject<T> {
 
     /**
      * Get number of active subscribers
-     */
-    /**
-     * Get number of active subscribers
      * @deprecated Use statekit.Stream and track subscribers in consumer if needed.
      */
     get observerCount(): number {
         return this.observers.size;
     }
 
-    /**
-     * Check if subject has been completed
-     */
     /**
      * Check if subject has been completed
      * @deprecated Use statekit.Stream instead.
