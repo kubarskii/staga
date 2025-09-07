@@ -224,9 +224,17 @@ export class SagaManager<TState extends object> {
             return {
                 get: () => base.get(),
                 subscribe: (observer: (value: TResult) => void) => {
-                    try { observer(base.get()); } catch { }
+                    try {
+                        observer(base.get());
+                    } catch (err) {
+                        console.error('[SagaManager] Computed observer error:', err);
+                    }
                     return base.subscribe(() => {
-                        try { observer(base.get()); } catch { }
+                        try {
+                            observer(base.get());
+                        } catch (err) {
+                            console.error('[SagaManager] Computed observer error:', err);
+                        }
                     });
                 },
                 get value() { return base.get(); }
@@ -239,9 +247,17 @@ export class SagaManager<TState extends object> {
             return {
                 get: () => base.get(),
                 subscribe: (observer: (value: TResult) => void) => {
-                    try { observer(base.get()); } catch { }
+                    try {
+                        observer(base.get());
+                    } catch (err) {
+                        console.error('[SagaManager] Computed observer error:', err);
+                    }
                     return base.subscribe(() => {
-                        try { observer(base.get()); } catch { }
+                        try {
+                            observer(base.get());
+                        } catch (err) {
+                            console.error('[SagaManager] Computed observer error:', err);
+                        }
                     });
                 },
                 get value() { return base.get(); }
@@ -357,7 +373,9 @@ export class SagaManager<TState extends object> {
     /**
      * Replay all recorded events
      */
-    async startReplay(): Promise<void> {
+    async startReplay(options: { delay?: number } = {}): Promise<void> {
+        const delay = options.delay ?? 100;
+
         if (this.recordedEvents.length === 0) {
             if (isDebugEnabled()) {
                 console.log('[SagaManager] No events to replay');
@@ -374,7 +392,7 @@ export class SagaManager<TState extends object> {
         try {
             for (const event of this.recordedEvents) {
                 // Add delay to make replay visible
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, delay));
 
                 if (event.type === 'state:change') {
                     // Replay state change

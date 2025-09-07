@@ -37,6 +37,18 @@ describe('StateManager', () => {
         expect(stateManager.getState()).toEqual(newState);
     });
 
+    it('should notify subscribers on redo', () => {
+        const observed: TestState[] = [];
+        stateManager.subscribe((s) => observed.push({ ...s }));
+        const updated = { count: 1, name: 'updated' };
+        stateManager.setState(updated);
+        stateManager.undo();
+        const beforeRedo = observed.length;
+        stateManager.redo();
+        expect(observed.length).toBe(beforeRedo + 1);
+        expect(observed[observed.length - 1]).toEqual(updated);
+    });
+
     it('should retain initial state when undo is called without prior changes', () => {
         const freshManager = new StateManager(initialState);
 

@@ -81,4 +81,16 @@ describe('Simplified Computed Functionality', () => {
 
         expect(itemCount$.value).toBe(3);
     });
+
+    it('should surface errors from observers', () => {
+        const a$ = saga.selectProperty('a');
+        const doubled$ = saga.computed(a$, (a) => a * 2);
+        const error = new Error('boom');
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+        doubled$.subscribe(() => { throw error; });
+        const state = saga.getState();
+        saga.stateManager.setState({ ...state, a: 2 });
+        expect(consoleSpy).toHaveBeenCalledWith('[SagaManager] Computed observer error:', error);
+        consoleSpy.mockRestore();
+    });
 });

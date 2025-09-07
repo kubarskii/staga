@@ -204,6 +204,45 @@ describe('Transaction Type Safety Fixes', () => {
         });
     });
 
+    describe('Transaction Baseline Cloning', () => {
+        it('should preserve function properties when detecting state changes', async () => {
+            interface ComplexState {
+                counter: number;
+                fn: () => number;
+            }
+
+            const complexStateManager = new StateManager<ComplexState>({ counter: 0, fn: () => 1 });
+            const tx = new Transaction<ComplexState, void>(
+                'clone-test',
+                complexStateManager,
+                mockEventEmitter,
+                []
+            );
+            tx.addStep('noop', () => { });
+
+            await tx.run();
+
+            expect(complexStateManager.undoStackLength).toBe(0);
+        });
+
+        it('should allow custom equality function', async () => {
+            const eq = vi.fn(() => true);
+            const manager = new StateManager<TestState>(initialState);
+            const tx = new Transaction<TestState, void>(
+                'eq-test',
+                manager,
+                mockEventEmitter,
+                [],
+                {},
+                { equalityFn: eq }
+            );
+            tx.addStep('change', (state) => { state.counter = 5; });
+            await tx.run();
+            expect(eq).toHaveBeenCalled();
+            expect(manager.undoStackLength).toBe(0);
+        });
+    });
+
     describe('Generic Step Definition', () => {
         it('should properly handle generic step execution', async () => {
             interface CustomPayload {
