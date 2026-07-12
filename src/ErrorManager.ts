@@ -69,6 +69,7 @@ export class ConsoleErrorHandler implements ErrorHandler {
 export class ErrorManager {
     private handlers: ErrorHandler[] = [];
     private errorCounts: Map<string, number> = new Map();
+    private severityCounts: Map<ErrorSeverity, number> = new Map();
     private rateLimitMap: Map<string, number> = new Map();
     private readonly rateLimitWindow = 1000; // 1 second
 
@@ -203,6 +204,10 @@ export class ErrorManager {
             }
         }
 
+        for (const [severity, count] of this.severityCounts) {
+            errorsBySeverity[severity] = count;
+        }
+
         return {
             totalErrors,
             errorsByComponent,
@@ -215,6 +220,7 @@ export class ErrorManager {
      */
     clearStats(): void {
         this.errorCounts.clear();
+        this.severityCounts.clear();
         this.rateLimitMap.clear();
     }
 
@@ -234,6 +240,7 @@ export class ErrorManager {
     private updateErrorCounts(error: StructuredError): void {
         const key = `${error.context.component}:${error.context.operation}`;
         this.errorCounts.set(key, (this.errorCounts.get(key) || 0) + 1);
+        this.severityCounts.set(error.severity, (this.severityCounts.get(error.severity) || 0) + 1);
     }
 }
 

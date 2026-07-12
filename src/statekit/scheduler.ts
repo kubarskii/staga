@@ -15,7 +15,7 @@ function rafIfPossible(fn: () => void) {
 }
 
 function idleIfPossible(fn: () => void) {
-    const ric = (globalThis as any).requestIdleCallback as undefined | ((cb: Function) => any);
+    const ric = (globalThis as any).requestIdleCallback as undefined | ((cb: () => void) => unknown);
     if (ric) ric(fn);
     else setTimeout(fn, 16);
 }

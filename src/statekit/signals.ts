@@ -24,26 +24,35 @@ export function signal<T>(initial: T): Signal<T> {
 
 export function derived<T>(compute: () => T): Signal<T> {
     let value: T;
-    let deps = new Set<SignalNode<any>>();
+    // Track the active dependency subscriptions so we can re-wire them whenever
+    // the set of accessed signals changes between computations (dynamic deps).
+    const depSubs = new Map<SignalNode<any>, Unsubscribe>();
     const node = new SignalNode<T>(undefined as any);
 
-    const recompute = () => {
-        for (const _ of deps) {/* noop to keep reference */ }
-        deps.clear();
-        const prev = currentCollector; currentCollector = deps;
+    const runCompute = () => {
+        const nextDeps = new Set<SignalNode<any>>();
+        const prev = currentCollector; currentCollector = nextDeps;
         try { value = compute(); } finally { currentCollector = prev; }
+
+        // Unsubscribe from dependencies that are no longer used
+        for (const [dep, unsub] of depSubs) {
+            if (!nextDeps.has(dep)) {
+                unsub();
+                depSubs.delete(dep);
+            }
+        }
+        // Subscribe to newly-added dependencies
+        for (const dep of nextDeps) {
+            if (!depSubs.has(dep)) {
+                depSubs.set(dep, dep.subscribe(recompute));
+            }
+        }
+
         node.set(value);
     };
+    const recompute = () => runCompute();
 
-    const runInitial = () => {
-        deps.clear();
-        const prev = currentCollector; currentCollector = deps;
-        try { value = compute(); } finally { currentCollector = prev; }
-        for (const d of deps) d.subscribe(recompute);
-        node.set(value);
-    };
-
-    runInitial();
+    runCompute();
     return { get: () => node.get(), set: () => { throw new Error('Cannot set a derived signal'); }, subscribe: (fn) => node.subscribe(fn) };
 }
 

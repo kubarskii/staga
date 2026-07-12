@@ -2,7 +2,7 @@
  * Tests for the disableAutoRollback feature
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SagaManager } from '../SagaManager';
 
 interface TestState {
@@ -179,7 +179,7 @@ describe('Disable Auto Rollback Feature', () => {
 
         try {
             await transaction.run();
-        } catch (error) {
+        } catch {
             // Expected to fail
         }
 
@@ -207,7 +207,7 @@ describe('Disable Auto Rollback Feature', () => {
 
         try {
             await transaction.run();
-        } catch (error) {
+        } catch {
             // Expected to fail
         }
 

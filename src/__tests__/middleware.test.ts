@@ -98,7 +98,6 @@ describe('Middleware', () => {
 
         it('should skip persistence when localStorage is unavailable', async () => {
             const original = (global as any).localStorage;
-            // @ts-ignore
             delete (global as any).localStorage;
             const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
 
@@ -159,7 +158,6 @@ describe('Middleware', () => {
 
         it('should return default state when localStorage is unavailable', () => {
             const original = (global as any).localStorage;
-            // @ts-ignore
             delete (global as any).localStorage;
             const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
 

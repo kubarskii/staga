@@ -66,7 +66,7 @@ export function createTransaction<S extends object>(store: Store<S>, steps: TxSt
             for (const step of steps) {
                 let attempt = 0;
                 const retries = step.retry ?? 0;
-                while (true) {
+                for (;;) {
                     if (ctx.signal.aborted) throw new DOMException('Aborted', 'AbortError');
                     attempt++;
                     emitTx({ type: 'step:start', txId: id, step: step.name, attempt });

@@ -3,7 +3,7 @@
  * and properly integrates with transactions and subscriptions
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SagaManager } from '../SagaManager';
 import { StateManager } from '../StateManager';
 
@@ -216,7 +216,7 @@ describe('Reactive Store as Central Component', () => {
 
             try {
                 await transaction.run();
-            } catch (error) {
+            } catch {
                 // Expected to fail
             }
 

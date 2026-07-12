@@ -28,6 +28,9 @@ export interface ReactiveProxyOptions {
 
 export class ReactiveStateProxy<TState extends object> {
     private proxyCache = new WeakMap<object, any>();
+    // Set of proxies we created, so we can recognise them and avoid
+    // double-wrapping a value that is already one of our proxies.
+    private proxyObjects = new WeakSet<object>();
     private mutationCount = 0;
     private lastNotification = 0;
     private debounceTimer: NodeJS.Timeout | null = null;
@@ -58,13 +61,17 @@ export class ReactiveStateProxy<TState extends object> {
     }
 
     private createProxyRecursive<T extends object>(obj: T): T {
+        // If this is already one of our proxies, don't wrap it again
+        if (this.proxyObjects.has(obj)) {
+            return obj;
+        }
         // Return cached proxy if it exists
         if (this.proxyCache.has(obj)) {
             return this.proxyCache.get(obj);
         }
 
         const proxy = new Proxy(obj, {
-            set: (target: any, property: string | symbol, value: any, receiver: any): boolean => {
+            set: (target: any, property: string | symbol, value: any): boolean => {
                 const oldValue = target[property];
 
                 // If the value is an object and deep reactivity is enabled, proxy it too
@@ -75,8 +82,12 @@ export class ReactiveStateProxy<TState extends object> {
                     value = this.createProxyRecursive(value);
                 }
 
-                // Set the value
-                const result = Reflect.set(target, property, value, receiver);
+                // Set the value directly on the target. We intentionally do NOT
+                // forward `receiver` here: `receiver` is the proxy itself, and
+                // passing it would make Reflect.set re-dispatch through the
+                // proxy's defineProperty trap, emitting a second notification for
+                // the same mutation.
+                const result = Reflect.set(target, property, value);
 
                 // Only notify if the value actually changed
                 if (result && oldValue !== value) {
@@ -100,11 +111,16 @@ export class ReactiveStateProxy<TState extends object> {
                 if (this.options.enableDeepReactivity &&
                     value !== null &&
                     typeof value === 'object' &&
-                    typeof value !== 'function' &&
-                    !this.proxyCache.has(value)) {
-                    const nestedProxy = this.createProxyRecursive(value);
-                    // Don't modify the target - just return the proxy
-                    return nestedProxy;
+                    typeof value !== 'function') {
+                    // Already one of our proxies (e.g. stored by the set trap): return as-is
+                    if (this.proxyObjects.has(value)) {
+                        return value;
+                    }
+                    // Return the cached proxy (or create one). Reusing the cache means
+                    // repeated access to the same nested object yields a stable proxy,
+                    // so deep mutations keep triggering reactive notifications.
+                    // Don't modify the target - just return the proxy.
+                    return this.createProxyRecursive(value);
                 }
 
                 return value;
@@ -142,8 +158,9 @@ export class ReactiveStateProxy<TState extends object> {
             }
         });
 
-        // Cache the proxy
+        // Cache the proxy and remember it as one of ours
         this.proxyCache.set(obj, proxy);
+        this.proxyObjects.add(proxy);
         return proxy;
     }
 
@@ -227,6 +244,7 @@ export class ReactiveStateProxy<TState extends object> {
             }
         }
         this.proxyCache = new WeakMap();
+        this.proxyObjects = new WeakSet();
 
         if (this.debugMode) {
             console.log('🔍 ReactiveStateProxy disposed');

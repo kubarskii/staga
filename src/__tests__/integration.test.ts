@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SagaManager, createPersistenceMiddleware, createLoggingMiddleware, createTimingMiddleware } from '../index';
+import { SagaManager, createPersistenceMiddleware, createLoggingMiddleware } from '../index';
 
 interface EcommerceState {
   products: Array<{ id: string; name: string; price: number; stock: number }>;
@@ -356,8 +356,8 @@ describe('Integration Tests', () => {
 
       // Create multiple transactions that create snapshots
       for (let i = 0; i < 10; i++) {
-        const tx = saga.createTransaction(`snapshot-test-${i}`);
         // Just creating transactions, not running them
+        saga.createTransaction(`snapshot-test-${i}`);
       }
 
       // Snapshots should only be created when transactions run

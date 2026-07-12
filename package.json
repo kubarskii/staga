@@ -26,8 +26,6 @@
         "type-check": "tsc --noEmit",
         "lint": "eslint src/**/*.ts",
         "format": "prettier --write src/**/*.ts",
-        "demo": "node examples/simple-demo.js",
-        "demo:advanced": "node examples/advanced-usage.js",
         "prepublishOnly": "npm run build && npm test"
     },
     "keywords": [
@@ -46,7 +44,7 @@
         "atomic",
         "operations"
     ],
-    "author": "Your Name <your.email@example.com>",
+    "author": "Aleksandr Kubarskii",
     "license": "MIT",
     "repository": {
         "type": "git",
@@ -61,18 +59,18 @@
     },
     "devDependencies": {
         "@types/node": "^20.10.0",
-        "@typescript-eslint/eslint-plugin": "^6.13.0",
-        "@typescript-eslint/parser": "^6.13.0",
+        "@typescript-eslint/eslint-plugin": "^8.63.0",
+        "@typescript-eslint/parser": "^8.63.0",
         "eslint": "^8.54.0",
         "prettier": "^3.1.0",
         "tsup": "^8.0.0",
         "typescript": "^5.3.0",
-        "vitest": "^1.0.0"
+        "vitest": "^3.2.7"
     },
     "engines": {
         "node": ">=16.0.0"
     },
     "directories": {
-        "example": "examples"
+        "example": "demo"
     }
 }

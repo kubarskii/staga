@@ -447,7 +447,7 @@ describe('Transaction', () => {
             });
 
             const transaction = sagaManager
-                .createTransaction<{}>('async-timing-test')
+                .createTransaction<Record<string, never>>('async-timing-test')
                 .addStep('fast-step', async (state) => {
                     await new Promise(resolve => setTimeout(resolve, 10));
                     state.value += 1;
@@ -476,7 +476,7 @@ describe('Transaction', () => {
             const sagaManager = SagaManager.create({ counter: 0 });
 
             const transaction = sagaManager
-                .createTransaction<{}>('compensation-error-test')
+                .createTransaction<Record<string, never>>('compensation-error-test')
                 .addStep('good-step', (state) => {
                     state.counter += 1;
                 }, () => {

@@ -189,6 +189,25 @@ export class StateManager<TState extends object> {
     }
 
     /**
+     * Apply a full state value through the underlying store so that reactive
+     * selectors/signals created via `select()` stay in sync. The store
+     * subscription (see constructor) updates `this.state` and emits on the
+     * state stream, so callers must not emit separately. Falls back to a direct
+     * assignment + notification when no store is present.
+     */
+    private applyState(next: TState): void {
+        if (this.store) {
+            // replaceState always emits and swaps the whole state object,
+            // which is the correct semantics for undo/redo/rollback.
+            this.store.replaceState(next);
+        } else {
+            this.state = next;
+            this.stateStream.next(this.state);
+            this.metrics.immediateNotifications++;
+        }
+    }
+
+    /**
      * Undo the last state change
      */
     undo(): void {
@@ -197,12 +216,10 @@ export class StateManager<TState extends object> {
             if (prev) {
                 // Push current state to redo stack for future redo
                 this.redoStack.push(this.options.clone(this.state));
-                this.state = prev;
                 this.metrics.undoOperations++;
 
-                // Notify subscribers immediately
-                this.stateStream.next(this.state);
-                this.metrics.immediateNotifications++;
+                // Route through the store so selectors/signals update too
+                this.applyState(prev);
             }
         }
     }
@@ -218,13 +235,7 @@ export class StateManager<TState extends object> {
                 this.undoStack.push(this.options.clone(this.state));
                 this.metrics.redoOperations++;
 
-                if (this.store) {
-                    this.store.setState(() => next);
-                } else {
-                    this.state = next;
-                    this.stateStream.next(this.state);
-                    this.metrics.immediateNotifications++;
-                }
+                this.applyState(next);
             }
         }
     }
@@ -433,10 +444,8 @@ export class StateManager<TState extends object> {
         if (this.snapshots.length > 0) {
             const snapshot = this.snapshots.pop();
             if (snapshot) {
-                this.state = snapshot;
-
-                this.stateStream.next(this.state);
-                this.metrics.immediateNotifications++;
+                // Route through the store so selectors/signals update too
+                this.applyState(snapshot);
             }
         }
     }

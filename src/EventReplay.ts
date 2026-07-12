@@ -550,7 +550,9 @@ export class EventReplayer<TPayload = unknown> {
         let delay = 0;
         if (options.realTimeMode && this.replayState.currentEvent > 0) {
             const prev = this.events[this.replayState.currentEvent - 1];
-            delay = (event.timestamp - prev.timestamp) / this.replayState.speed;
+            if (prev) {
+                delay = (event.timestamp - prev.timestamp) / this.replayState.speed;
+            }
         }
 
         this.timeoutId = setTimeout(async () => {

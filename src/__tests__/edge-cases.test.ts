@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SagaManager, StateManager, Transaction } from '../index';
+import { SagaManager, StateManager } from '../index';
 
 interface TestState {
   value: number;

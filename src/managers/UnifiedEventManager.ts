@@ -129,8 +129,7 @@ export class UnifiedEventManager {
         this.eventMetrics.totalSubscriptions++;
 
         // Create unified subscription using reactive streams only
-        const stream = this.getOrCreateEventStream(eventKey);
-        const subscription = stream.subscribe((sagaEvent) => {
+        return this.trackSubscription(eventKey, (sagaEvent) => {
             ErrorUtils.safeExecute(() => {
                 // Convert SagaEvent back to legacy format for the callback
                 if (EventAdapter.isLegacyFormat(sagaEvent)) {
@@ -155,13 +154,6 @@ export class UnifiedEventManager {
                 metadata: { listenerType: 'legacy-unified' }
             });
         });
-
-        this.subscriptionManager.add(subscription);
-
-        return () => {
-            subscription();
-            this.subscriptionManager.remove(subscription);
-        };
     }
 
     /**
@@ -193,8 +185,7 @@ export class UnifiedEventManager {
     ): () => void {
         this.eventMetrics.totalSubscriptions++;
 
-        const stream = this.getOrCreateEventStream(eventType);
-        const subscription = stream.subscribe((sagaEvent) => {
+        return this.trackSubscription(eventType, (sagaEvent) => {
             ErrorUtils.safeExecute(() => {
                 // Type-safe event handling
                 if (this.isEventOfType<T, TPayload>(sagaEvent, eventType)) {
@@ -206,13 +197,6 @@ export class UnifiedEventManager {
                 metadata: { listenerType: 'reactive-unified' }
             });
         });
-
-        this.subscriptionManager.add(subscription);
-
-        return () => {
-            subscription();
-            this.subscriptionManager.remove(subscription);
-        };
     }
 
     /**
@@ -222,8 +206,7 @@ export class UnifiedEventManager {
         const key = '*';
         this.eventMetrics.totalSubscriptions++;
 
-        const stream = this.getOrCreateEventStream(key);
-        const subscription = stream.subscribe((sagaEvent) => {
+        return this.trackSubscription(key, (sagaEvent) => {
             ErrorUtils.safeExecute(() => {
                 callback(sagaEvent as AnySagaEvent);
             }, {
@@ -232,13 +215,6 @@ export class UnifiedEventManager {
                 metadata: { listenerType: 'any-unified' }
             });
         });
-
-        this.subscriptionManager.add(subscription);
-
-        return () => {
-            subscription();
-            this.subscriptionManager.remove(subscription);
-        };
     }
 
     /**
@@ -260,8 +236,7 @@ export class UnifiedEventManager {
     ): () => void {
         this.eventMetrics.totalSubscriptions++;
 
-        const stream = this.getOrCreateEventStream(eventType);
-        const subscription = stream.subscribe((sagaEvent) => {
+        return this.trackSubscription(eventType, (sagaEvent) => {
             ErrorUtils.safeExecute(() => {
                 if (this.isEventOfType<TEvent['type']>(sagaEvent, eventType)) {
                     callback(sagaEvent as unknown as TEvent);
@@ -272,13 +247,6 @@ export class UnifiedEventManager {
                 metadata: { listenerType: 'typed-unified' }
             });
         });
-
-        this.subscriptionManager.add(subscription);
-
-        return () => {
-            subscription();
-            this.subscriptionManager.remove(subscription);
-        };
     }
 
     // ===== REACTIVE STREAM ACCESS =====
@@ -409,6 +377,31 @@ export class UnifiedEventManager {
     }
 
     // ===== PRIVATE UNIFIED METHODS =====
+
+    /**
+     * Subscribe an observer to an event stream while keeping the live subscriber
+     * count for that stream accurate. The returned unsubscribe is idempotent, so
+     * calling it more than once does not corrupt the count.
+     */
+    private trackSubscription(
+        eventKey: string,
+        observer: (event: SagaEvent<any>) => void
+    ): () => void {
+        const stream = this.getOrCreateEventStream(eventKey);
+        const subscription = stream.subscribe(observer);
+        this.streamSubscriberCounts.set(eventKey, (this.streamSubscriberCounts.get(eventKey) || 0) + 1);
+        this.subscriptionManager.add(subscription);
+
+        let unsubscribed = false;
+        return () => {
+            if (unsubscribed) return;
+            unsubscribed = true;
+            subscription();
+            this.subscriptionManager.remove(subscription);
+            const current = this.streamSubscriberCounts.get(eventKey) || 0;
+            this.streamSubscriberCounts.set(eventKey, Math.max(0, current - 1));
+        };
+    }
 
     /**
      * Get or create event stream (unified implementation)
