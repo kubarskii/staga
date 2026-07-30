@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Package module resolution.** `package.json` `exports` now correctly routes
+  `import` to the ESM bundle (`dist/index.mjs`) and `require` to the CJS bundle
+  (`dist/index.js`). Previously both pointed to the CJS file, so ESM consumers
+  received CommonJS output. The `module` field was also corrected and a `types`
+  condition was added to the `exports` map.
+- **Consistent deep cloning.** `SagaManager.recordEvent()` now uses
+  `StateManager.clone()` and `Store.setDraft()` now uses the statekit `deepClone`
+  utility instead of `JSON.parse(JSON.stringify(...))`. This preserves `undefined`
+  values in arrays and leverages `structuredClone` when available.
+- **Encapsulation.** `Transaction.run()` now accesses the configured equality
+  function via the new public `StateManager.getEqualityFn()` method instead of
+  reading the private `options` field through an `as any` cast.
 - **Reactive selectors stay in sync with undo/rollback.** `StateManager.undo()`
   and `rollbackToLastSnapshot()` now propagate through the reactive core, so
   `select()`-based signals no longer report stale values (previously only
@@ -28,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CI.** The test workflow now runs against a Node.js 20 **and** 22 matrix to
+  verify compatibility with current LTS releases.
+- **Tooling.** Added `.editorconfig` for consistent formatting across editors
+  and a V8 coverage configuration in `vitest.config.ts` (run
+  `npm i -D @vitest/coverage-v8 && vitest run --coverage` to collect metrics).
+- **Tree-shaking.** Declared `"sideEffects": false` in `package.json` so
+  bundlers can safely eliminate unused exports.
 - **Documentation.** Corrected the install/import name to `@staga/core` and
   significantly expanded the README (statekit primitives, configuration
   options, selectors & computed values, metrics, error handling, DI, plugins).

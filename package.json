@@ -3,14 +3,16 @@
     "version": "1.0.0",
     "description": "A TypeScript library for managing state transactions with saga pattern, rollbacks, and middleware support",
     "main": "dist/index.js",
-    "module": "dist/index.js",
+    "module": "dist/index.mjs",
     "types": "dist/index.d.ts",
     "exports": {
         ".": {
-            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.mjs",
             "require": "./dist/index.js"
         }
     },
+    "sideEffects": false,
     "files": [
         "dist",
         "README.md",
