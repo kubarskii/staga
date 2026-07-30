@@ -173,8 +173,8 @@ export class Transaction<TState extends object, TPayload = unknown> {
 
 
   /**
- * Execute the transaction with all its steps
- */
+   * Execute the transaction with all its steps
+   */
   async run(payload: TPayload): Promise<void> {
     const startTime = Date.now();
 
@@ -219,7 +219,7 @@ export class Transaction<TState extends object, TPayload = unknown> {
 
         // After successful execution, if state has changed, add it to undo stack
         const finalState = this.stateManager.getState();
-        const eq = this.options.equalityFn ?? ((this.stateManager as any)['options'].equalityFn as (a: TState, b: TState) => boolean);
+        const eq = this.options.equalityFn ?? this.stateManager.getEqualityFn();
         if (!eq(initialState, finalState)) {
           this.stateManager.addToUndoStack(initialState);
         }

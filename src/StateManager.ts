@@ -486,6 +486,13 @@ export class StateManager<TState extends object> {
     }
 
     /**
+     * Expose the configured equality function for internal consumers like Transaction
+     */
+    public getEqualityFn(): <T>(a: T, b: T) => boolean {
+        return this.options.equalityFn;
+    }
+
+    /**
      * Default deep clone that preserves undefined values in arrays and objects
      */
     private defaultClone<T>(value: T): T {

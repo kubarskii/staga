@@ -1,4 +1,5 @@
 import type { EqualityFn, Unsubscribe } from './utils';
+import { deepClone } from './utils';
 import type { Priority, Scheduler } from './scheduler';
 import type { StateMiddleware, TxEventMiddleware, SetStateAction } from './middlewares';
 
@@ -39,8 +40,7 @@ export class Store<S extends object> {
     }
 
     setDraft(recipe: (draft: S) => void, action?: SetStateAction, options?: SetStateOptions) {
-        const base = this.state as S;
-        const draft = JSON.parse(JSON.stringify(base)) as S;
+        const draft = deepClone(this.state);
         recipe(draft);
         this.setStateInternal(draft, action, options);
     }

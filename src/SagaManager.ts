@@ -60,7 +60,7 @@ export class SagaManager<TState extends object> {
             type,
             payload,
             timestamp: Date.now(),
-            stateSnapshot: JSON.parse(JSON.stringify(stateSnapshot)) // Deep clone to preserve snapshot
+            stateSnapshot: this._stateManager.clone(stateSnapshot)
         });
     }
 
